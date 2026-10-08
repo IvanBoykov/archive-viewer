@@ -123,3 +123,7 @@ pinned `requirements.txt` and `requirements-dev.txt` are generated with:
 pip-compile requirements.in
 pip-compile requirements-dev.in
 ```
+
+## License
+
+Distributed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE).
