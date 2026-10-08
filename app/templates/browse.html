@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{# Directory level of the tree: cameras, years, months, days or hours.
+   Pure server-side rendering; navigating the archive needs no JavaScript. #}
+{% block content %}
+<h1>{{ context.heading }}</h1>
+{% if context.subheading %}
+<p class="lede">{{ context.subheading }}</p>
+{% endif %}
+
+{% if context.entries %}
+<nav class="tree" aria-label="{{ context.heading }}">
+  <ul class="tree__list">
+    {% for entry in context.entries %}
+    <li class="tree__item tree__item--{{ entry.kind }}">
+      <a class="tree__link" href="{{ entry.url }}">{{ entry.label }}</a>
+    </li>
+    {% endfor %}
+  </ul>
+</nav>
+{% else %}
+<p class="empty">{{ context.empty_message or "Nothing has been archived here yet." }}</p>
+{% endif %}
+{% endblock %}

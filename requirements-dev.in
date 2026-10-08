@@ -1,0 +1,5 @@
+# Test-only dependencies: pip-compile requirements-dev.in
+-r requirements.txt
+pytest
+httpx
+moto[s3,server]

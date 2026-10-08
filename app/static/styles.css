@@ -1,0 +1,338 @@
+/* Minimal, high-contrast layout. No framework, no build step. */
+
+:root {
+  --bg: #ffffff;
+  --fg: #16181d;
+  --muted: #5a6270;
+  --line: #d5d9e0;
+  --link: #0b4fbe;
+  --link-visited: #5a2ea6;
+  --accent: #0b4fbe;
+  --panel: #f5f6f8;
+  --danger: #8a1c1c;
+  --focus: #b3261e;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+
+a {
+  color: var(--link);
+}
+
+a:visited {
+  color: var(--link-visited);
+}
+
+/* Visible focus for keyboard users on every interactive element. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+video:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* -- skip link --------------------------------------------------------- */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--fg);
+  color: #fff;
+  padding: 0.5rem 0.75rem;
+  z-index: 20;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+/* -- visually hidden text for screen readers --------------------------- */
+/* Clip instead of display:none so assistive tech still reads the content. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* -- page chrome ------------------------------------------------------- */
+.site-header,
+.site-footer {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.site-footer {
+  border-bottom: 0;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.site-header__brand,
+.site-header__meta,
+.site-footer p {
+  margin: 0.125rem 0;
+}
+
+.site-header__brand a {
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-header__meta {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.main {
+  max-width: 60rem;
+  padding: 1rem;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0 0 0.25rem;
+}
+
+.lede {
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
+
+.empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* -- breadcrumbs ------------------------------------------------------- */
+.breadcrumbs {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.875rem;
+}
+
+.breadcrumbs__list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+}
+
+.breadcrumbs__item::after {
+  content: "/";
+  margin-left: 0.4rem;
+  color: var(--muted);
+}
+
+.breadcrumbs__item:last-child::after {
+  content: "";
+  margin-left: 0;
+}
+
+/* -- directory tree ---------------------------------------------------- */
+.tree__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.tree__item + .tree__item {
+  border-top: 1px solid var(--line);
+}
+
+.tree__link {
+  display: block;
+  padding: 0.6rem 0.75rem;
+  text-decoration: none;
+}
+
+.tree__link:hover {
+  background: var(--panel);
+  text-decoration: underline;
+}
+
+/* -- hour navigation --------------------------------------------------- */
+.hour-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  justify-content: space-between;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.hour-nav__link {
+  text-decoration: none;
+}
+
+.hour-nav__link--disabled {
+  color: var(--muted);
+}
+
+/* -- clip list --------------------------------------------------------- */
+.clips__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.clips__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.clips__time {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1.05rem;
+  font-weight: 600;
+  min-width: 3.5rem;
+}
+
+.clips__start {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--muted);
+}
+
+.clips__badge {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--danger);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
+
+.clips__direct {
+  font-size: 0.875rem;
+}
+
+/* -- buttons ----------------------------------------------------------- */
+.btn {
+  font: inherit;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn--close {
+  margin-left: auto;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* -- modal player ------------------------------------------------------ */
+.modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 10;
+}
+
+.modal[hidden] {
+  display: none;
+}
+
+.modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 12, 16, 0.75);
+}
+
+.modal__panel {
+  position: relative;
+  width: min(60rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.modal__title {
+  font-size: 1.125rem;
+  margin: 0 0 0.25rem;
+}
+
+.modal__now {
+  margin: 0 0 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.modal__video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: 6px;
+}
+
+.modal__notice {
+  margin: 0.75rem 0 0;
+  color: var(--danger);
+  font-size: 0.875rem;
+}
+
+.modal__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

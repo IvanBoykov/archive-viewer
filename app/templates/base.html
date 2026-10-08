@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}{{ context.title }} &middot; Video archive{% endblock %}</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    {% block head %}{% endblock %}
+  </head>
+  <body class="page page--{{ context.level }}">
+    <a class="skip-link" href="#main">Skip to main content</a>
+
+    <header class="site-header">
+      <p class="site-header__brand">
+        <a href="/">Video archive</a>
+      </p>
+      <p class="site-header__meta">
+        Storage: <code>{{ common_prefix }}</code> &middot;
+        Delivery:
+        {%- if mode == 'presigned' %} direct links to S3 (valid {{ presign_expiry_minutes }} minutes)
+        {%- else %} streamed by this server {%- endif %}
+      </p>
+    </header>
+
+    {% include "partials/breadcrumbs.html" %}
+
+    <main id="main" class="main">
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+      <p>{{ delivery_note }}</p>
+    </footer>
+
+    {# Screen-reader announcement region. Visually hidden, polite, atomic. #}
+    <div id="live-region" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

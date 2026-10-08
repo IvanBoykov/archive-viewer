@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{# Hourly clip list. Navigation to other folders stays plain HTML; JavaScript
+   is loaded only on this page, for the modal player. #}
+{% block content %}
+<h1>{{ context.heading }}</h1>
+<p class="lede">{{ context.subheading }} &mdash; {{ clips | length }} clip{{ '' if clips | length == 1 else 's' }}.</p>
+
+<p class="hour-nav" data-hour-nav>
+  {% if navigation.previous %}
+  <a class="hour-nav__link" href="{{ navigation.previous }}" rel="prev">
+    &larr; Previous hour: {{ navigation.previous_label }}
+  </a>
+  {% else %}
+  <span class="hour-nav__link hour-nav__link--disabled" aria-disabled="true">
+    &larr; Start of the archive
+  </span>
+  {% endif %}
+  {% if navigation.next %}
+  <a class="hour-nav__link" href="{{ navigation.next }}" rel="next">
+    Next hour: {{ navigation.next_label }} &rarr;
+  </a>
+  {% else %}
+  <span class="hour-nav__link hour-nav__link--disabled" aria-disabled="true">
+    End of the archive
+  </span>
+  {% endif %}
+</p>
+
+<nav class="clips" aria-label="Clips recorded {{ hour_meta.hour_label }}">
+  <ul class="clips__list">
+    {% for clip in clips %}
+    <li class="clips__item{% if clip.truncated %} clips__item--truncated{% endif %}">
+      <span class="clips__time">{{ clip.time }}</span>
+      <span class="clips__start">{{ clip.absolute_time }}</span>
+      {% if clip.truncated %}
+      <span class="clips__badge">incomplete</span>
+      {% endif %}
+      {# Direct link: presigned URL when the Host is mapped, else the proxy. #}
+      <a class="clips__direct" href="{{ clip.video_url }}" download="{{ clip.filename }}">
+        Download {{ clip.filename }}
+      </a>
+      <button type="button"
+              class="btn btn--player"
+              data-clip-index="{{ loop.index0 }}"
+              aria-label="Open clip {{ clip.absolute_time }} in player">
+        Open in player
+      </button>
+    </li>
+    {% endfor %}
+  </ul>
+</nav>
+
+{# Inline clip data for intra-hour navigation. Keep as a JSON array. #}
+<script type="application/json" id="hour-clips-data">{{ clips_json | safe }}</script>
+{# Hour metadata plus cross-boundary targets from the backend calendar search. #}
+<script type="application/json" id="hour-nav-data">{{ nav_json | safe }}</script>
+
+{% include "partials/player-modal.html" %}
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/player.js" defer></script>
+{% endblock %}

@@ -1,0 +1,16 @@
+{# Standard breadcrumb trail: a labelled nav containing an ordered list. #}
+{% if context.breadcrumbs | length > 1 %}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <ol class="breadcrumbs__list">
+    {% for crumb in context.breadcrumbs %}
+    <li class="breadcrumbs__item">
+      {% if not loop.last %}
+      <a href="{{ crumb.url }}">{{ crumb.label }}</a>
+      {% else %}
+      <span aria-current="page">{{ crumb.label }}</span>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+</nav>
+{% endif %}
