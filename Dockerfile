@@ -1,0 +1,31 @@
+FROM python:3.14-slim AS deps
+
+WORKDIR /build
+
+# Копируем только файл зависимостей для использования кэша Docker
+COPY requirements.txt .
+
+# Устанавливаем зависимости в изолированный префикс.
+# --no-cache-dir уменьшает размер слоя.
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# Финальная стадия (Runtime)
+FROM python:3.14-slim
+
+WORKDIR /code
+
+# Копируем установленные зависимости из стадии deps.
+# Префикс /install корректно ложится в /usr/local, 
+# который уже находится в PATH и PYTHONPATH базового образа.
+COPY --from=deps /install /usr/local
+ENV PYTHONUNBUFFERED=1
+# Создаем непривилегированного пользователя для безопасности
+RUN useradd -m -r appuser
+# Копируем исходный код проекта
+COPY --chown=appuser:appuser ./app ./app
+
+USER appuser
+
+# Точка входа
+CMD ["uvicorn", "app.main:app", "--host", "::", "--port", "8000"]
+EXPOSE 8000

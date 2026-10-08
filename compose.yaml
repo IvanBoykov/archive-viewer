@@ -1,0 +1,16 @@
+services:
+  archive-viewer:
+    image: archive-viewer
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    # Every setting is an environment variable: copy env.example to .env and
+    # edit it there. The file is required - S3_BUCKET has no default - so
+    # compose refuses to start without it rather than running on defaults.
+    env_file:
+      - path: .env
+        required: true
+    ports:
+      # Application has no auth; this publishes it on every host interface. Bind to
+      # loopback (127.0.0.1:8000:8000) and use reverse proxy with auth. Don't forget to firewall the port if the host is exposed
+      - 8000:8000
