@@ -157,6 +157,16 @@ def test_generated_links_have_no_empty_segments(root_client):
         assert "//" not in href, href
 
 
+def test_camera_page_groups_months_without_a_prefix(root_client):
+    """Year grouping must not assume a common prefix on either side of the URL."""
+
+    body = root_client.get("/front/").text
+    assert '<a class="years__link" href="/front/2026/">2026</a>' in body
+    assert 'href="/front/2026/10/">October' in body
+    for href in re.findall(r'href="(/[^"]*)"', body):
+        assert "//" not in href, href
+
+
 def test_hour_page_lists_clips_without_a_prefix(root_client):
     response = root_client.get(root_url("front", 2026, 10, 4, 19))
     assert response.status_code == 200

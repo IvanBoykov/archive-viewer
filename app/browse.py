@@ -116,6 +116,19 @@ class PeriodRef:
 
 
 @dataclass
+class YearGroup:
+    """One year heading on the camera page, with the months inside it.
+
+    ``url`` targets the year page, which stays reachable as its own listing and
+    as a breadcrumb step.
+    """
+
+    url: str
+    label: str
+    entries: List[Entry] = field(default_factory=list)
+
+
+@dataclass
 class Crumb:
     url: str
     label: str
@@ -138,6 +151,7 @@ class PageContext:
     period: Optional[str] = None
     prev_period: Optional[PeriodRef] = None
     next_period: Optional[PeriodRef] = None
+    year_groups: List[YearGroup] = field(default_factory=list)
     hour_meta: Dict[str, object] = field(default_factory=dict)
     empty_message: Optional[str] = None
 
@@ -205,6 +219,12 @@ class BrowseService:
             if level != LEVEL_CAMERAS
         )
 
+        # A camera page groups its months under a heading per year, so it needs
+        # one extra listing per year: still one call per level, never a scan.
+        groups: List[YearGroup] = []
+        if level == LEVEL_YEARS and camera is not None:
+            groups, entries = self._year_groups(common, camera, entries)
+
         prev_ref, next_ref = (None, None)
         if camera is not None and level in _PERIOD_LEVELS:
             prev_ref, next_ref = self._period_neighbours(
@@ -222,10 +242,38 @@ class BrowseService:
             period=_PERIOD_LEVELS.get(level),
             prev_period=prev_ref,
             next_period=next_ref,
+            year_groups=groups,
         )
-        if not entries:
+        if not entries and not groups:
             context.empty_message = "No recordings have been archived here yet."
         return context
+
+    def _year_groups(self, common: str, camera: str,
+                     entries: List[Entry]) -> Tuple[List[YearGroup], List[Entry]]:
+        """Group the months of each year under a year heading.
+
+        Returns the groups plus any entry that is not a year, so a stray folder
+        or object stays visible instead of being dropped with no heading.
+        """
+
+        groups: List[YearGroup] = []
+        leftovers: List[Entry] = []
+        for entry in entries:
+            if entry.kind != "directory" or not YEAR_RE.match(entry.label):
+                leftovers.append(entry)
+                continue
+            year = int(entry.label)
+            months = self._month_entries(common, camera, year)
+            groups.append(YearGroup(url=entry.url or "", label=entry.label,
+                                    entries=months))
+        return groups, leftovers
+
+    def _month_entries(self, common: str, camera: str, year: int) -> List[Entry]:
+        """List the months of one year, labelled and linked like the year page."""
+
+        prefix = join_prefix(common, camera, f"{year:04d}")
+        return [self._directory_entry(common, LEVEL_MONTHS, camera, year, None, None, name)
+                for name in self.store.list_child_directories(prefix)]
 
     def _period_neighbours(self, common: str, period: str,
                            current: HourRef) -> Tuple[Optional[PeriodRef], Optional[PeriodRef]]:
@@ -362,7 +410,7 @@ class BrowseService:
     def _subheading(self, level: str) -> Optional[str]:
         hints = {
             LEVEL_CAMERAS: "Select a camera",
-            LEVEL_YEARS: "Select a year",
+            LEVEL_YEARS: "Recorded months, grouped by year",
             LEVEL_MONTHS: "Select a month",
             LEVEL_DAYS: "Select a day",
             LEVEL_HOURS: "Select an hour to list its clips",

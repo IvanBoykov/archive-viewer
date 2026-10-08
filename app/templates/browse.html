@@ -12,8 +12,37 @@
 {% with nav_position = "top" %}{% include "partials/period-nav.html" %}{% endwith %}
 {% endif %}
 
+{% if context.year_groups %}
+{# Camera page: months grouped under a heading per year. Each heading links to
+   the year page, which remains a listing of its own. #}
+<nav class="years" aria-label="{{ context.heading }}">
+  {% for group in context.year_groups %}
+  <section class="years__group">
+    <h2 class="years__heading">
+      <a class="years__link" href="{{ group.url }}">{{ group.label }}</a>
+    </h2>
+    {% if group.entries %}
+    <ul class="tree__list">
+      {% for entry in group.entries %}
+      <li class="tree__item tree__item--{{ entry.kind }}">
+        {% if entry.url %}
+        <a class="tree__link" href="{{ entry.url }}">{{ entry.label }}</a>
+        {% else %}
+        <span class="tree__plain">{{ entry.label }}</span>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="empty empty--compact">No months recorded.</p>
+    {% endif %}
+  </section>
+  {% endfor %}
+</nav>
+{% endif %}
+
 {% if context.entries %}
-<nav class="tree" aria-label="{{ context.heading }}">
+<nav class="tree" aria-label="{{ context.heading }}{% if context.year_groups %} - other entries{% endif %}">
   <ul class="tree__list">
     {% for entry in context.entries %}
     <li class="tree__item tree__item--{{ entry.kind }}">
@@ -28,7 +57,7 @@
     {% endfor %}
   </ul>
 </nav>
-{% else %}
+{% elif not context.year_groups %}
 <p class="empty">{{ context.empty_message or "Nothing has been archived here yet." }}</p>
 {% endif %}
 

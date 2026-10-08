@@ -63,3 +63,13 @@ strict and still 404s.
   distinct aria-labels.
 - This terminal renders `/2026/10/` as `2026-10-` in some output: trust
   `ord()` counts, not eyeballed URLs, when checking URL formats.
+
+## Camera page (months grouped by year)
+- `LEVEL_YEARS` is the camera page. `BrowseService._year_groups` turns its year
+  entries into `YearGroup` records and lists each year's months with one extra
+  `list_level` call per year. Never walk deeper than that.
+- Entries that are not years (stray folders, files) stay in `context.entries`
+  and render in the normal `.tree` nav, so grouping cannot hide data.
+- `browse.html` renders `context.year_groups` first, then `context.entries`.
+  The `<h2>` per year links to the year page, which still exists as its own
+  listing and breadcrumb step.
