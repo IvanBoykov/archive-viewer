@@ -47,3 +47,19 @@ validates each folder against the level regex, refuses ambiguous four-digit
 camera names, and catches `ValueError`; such entries get `url=None` and render
 as `.tree__plain` text. Traversal (`parse_path`, next/previous) was already
 strict and still 404s.
+
+## Period navigation (month and day pages)
+- Levels are named after the folders they list: LEVEL_DAYS is the month page,
+  LEVEL_HOURS the day page. `_PERIOD_LEVELS` maps them to PERIOD_MONTH/PERIOD_DAY.
+- `archive.period_navigation` reuses `find_next_hour`/`find_previous_hour` with
+  anchor hours placed outside the current period: back = first day 00:00,
+  forward = last day 23:00 (last day via `calendar.monthrange`, so February is
+  correct). Listing pages have no hour of their own, hence the extremes.
+- `browse.PeriodRef` carries camera/year/optional-day. Keeping day separate is
+  what guarantees a month page links to a month page; do not pass HourRef URLs
+  to those templates.
+- `partials/period-nav.html` is included twice via `{% with nav_position=... %}`
+  (a bare `{% include ... with x=1 %}` is invalid Jinja). Both landmarks need
+  distinct aria-labels.
+- This terminal renders `/2026/10/` as `2026-10-` in some output: trust
+  `ord()` counts, not eyeballed URLs, when checking URL formats.

@@ -207,6 +207,29 @@ h1 {
   color: var(--muted);
 }
 
+/* -- previous/next month and day navigation --------------------------- */
+.period-nav__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  justify-content: space-between;
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+}
+
+.period-nav--bottom .period-nav__list {
+  margin: 1.5rem 0 0;
+}
+
+.period-nav__link {
+  text-decoration: none;
+}
+
+.period-nav__link--disabled {
+  color: var(--muted);
+}
+
 /* -- clip list --------------------------------------------------------- */
 .clips__list {
   list-style: none;

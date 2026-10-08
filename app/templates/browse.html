@@ -8,6 +8,10 @@
 <p class="lede">{{ context.subheading }}</p>
 {% endif %}
 
+{% if context.period %}
+{% with nav_position = "top" %}{% include "partials/period-nav.html" %}{% endwith %}
+{% endif %}
+
 {% if context.entries %}
 <nav class="tree" aria-label="{{ context.heading }}">
   <ul class="tree__list">
@@ -26,5 +30,10 @@
 </nav>
 {% else %}
 <p class="empty">{{ context.empty_message or "Nothing has been archived here yet." }}</p>
+{% endif %}
+
+{# The same navigation repeated at the end of a long listing. #}
+{% if context.period %}
+{% with nav_position = "bottom" %}{% include "partials/period-nav.html" %}{% endwith %}
 {% endif %}
 {% endblock %}

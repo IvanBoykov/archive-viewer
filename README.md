@@ -33,6 +33,22 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 `/healthz` reports the configured bucket and prefix.
 
+## Navigation
+
+Every listing level is server-rendered; JavaScript is used only by the player on
+the hour page.
+
+| Page | Links |
+| --- | --- |
+| Cameras, years | None: the listing already shows every entry. |
+| Months, days | Previous and next period, at the top and the bottom of the listing. |
+| Hours | Previous and next hour, consumed by both the page and the player. |
+
+Month and day links jump to the nearest period that actually holds clips, so an
+empty period is never one click away. A month page links to a month page and a
+day page to a day page, because the target is trimmed to the level of the page
+you are on.
+
 ## Configuration
 
 All settings come from the environment, loaded from `.env` when present. See
@@ -59,7 +75,8 @@ python -m pytest
 
 The suite runs against `moto`'s fake S3 and covers the level parsing and label
 rules, cross-boundary previous/next hour search across empty hours, days,
-months and years, the browse routes and their 404 handling, Range-proxy
+months and years, the month and day listings that link to the previous and next
+period of their own level, the browse routes and their 404 handling, Range-proxy
 semantics, and host-driven proxy-versus-presign selection.
 
 ## Dependencies

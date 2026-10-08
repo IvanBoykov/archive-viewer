@@ -1,0 +1,36 @@
+{# Previous/next links for a month or day listing.
+
+   Included twice per page; ``nav_position`` ("top"/"bottom") keeps the two
+   landmarks distinguishable for screen readers. Hrefs come from PeriodRef.url(),
+   so a month page always links to a month page and a day page to a day page.
+   Empty periods are skipped server side by the calendar search. #}
+{% set position = nav_position | default("top") %}
+{% set noun = "day" if context.period == "day" else "month" %}
+{% set suffix = ", at the end of the listing" if position == "bottom" else "" %}
+<nav class="period-nav period-nav--{{ position }}"
+     aria-label="Previous and next {{ noun }}{{ suffix }}">
+  <ul class="period-nav__list">
+    <li class="period-nav__item">
+      {% if context.prev_period %}
+      <a class="period-nav__link" href="{{ context.prev_period.url(common_prefix) }}" rel="prev">
+        &larr; Previous {{ noun }}: {{ context.prev_period.label() }}
+      </a>
+      {% else %}
+      <span class="period-nav__link period-nav__link--disabled" aria-disabled="true">
+        &larr; Start of the archive
+      </span>
+      {% endif %}
+    </li>
+    <li class="period-nav__item">
+      {% if context.next_period %}
+      <a class="period-nav__link" href="{{ context.next_period.url(common_prefix) }}" rel="next">
+        Next {{ noun }}: {{ context.next_period.label() }} &rarr;
+      </a>
+      {% else %}
+      <span class="period-nav__link period-nav__link--disabled" aria-disabled="true">
+        End of the archive
+      </span>
+      {% endif %}
+    </li>
+  </ul>
+</nav>

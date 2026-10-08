@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from .archive import (
     DAY_RE,
@@ -21,6 +21,8 @@ from .archive import (
     LEVEL_MONTHS,
     LEVEL_YEARS,
     MONTH_RE,
+    PERIOD_DAY,
+    PERIOD_MONTH,
     YEAR_RE,
     Clip,
     HourRef,
@@ -32,6 +34,7 @@ from .archive import (
     normalize_common_prefix,
     parse_hour_segments,
     parse_path,
+    period_navigation,
     weekday_name,
 )
 from .s3 import ArchiveStore
@@ -45,6 +48,15 @@ _LEVEL_NAME_RE = {
     LEVEL_MONTHS: MONTH_RE,
     LEVEL_DAYS: DAY_RE,
     LEVEL_HOURS: HOUR_RE,
+}
+
+#: Listing levels that offer previous/next links, and the period they navigate.
+#: Levels are named after the folders they list, so LEVEL_DAYS is the month page
+#: and LEVEL_HOURS the day page. Cameras and years list everything at once, and
+#: the hour page already has its own navigation, so none of them appear here.
+_PERIOD_LEVELS = {
+    LEVEL_DAYS: PERIOD_MONTH,
+    LEVEL_HOURS: PERIOD_DAY,
 }
 
 
@@ -69,6 +81,40 @@ class Entry:
         return {"url": self.url, "label": self.label, "kind": self.kind, "key": self.key}
 
 
+@dataclass(frozen=True)
+class PeriodRef:
+    """A month or a day of one camera.
+
+    Separate from :class:`HourRef` so a previous/next link from a month or day
+    listing can only ever point at a page of the same level.
+    """
+
+    camera: str
+    year: int
+    month: int
+    day: Optional[int] = None
+
+    @classmethod
+    def from_hour(cls, hour_ref: HourRef, period: str) -> "PeriodRef":
+        day = hour_ref.day if period == PERIOD_DAY else None
+        return cls(hour_ref.camera, hour_ref.year, hour_ref.month, day)
+
+    @property
+    def period(self) -> str:
+        return PERIOD_DAY if self.day is not None else PERIOD_MONTH
+
+    def url(self, common_prefix: str) -> str:
+        return build_path(common_prefix, camera=self.camera, year=self.year,
+                          month=self.month, day=self.day)
+
+    def label(self) -> str:
+        if self.day is None:
+            return f"{month_name(self.month)} {self.year}"
+        ref = HourRef(camera=self.camera, year=self.year, month=self.month,
+                      day=self.day, hour=0)
+        return date_label(ref)
+
+
 @dataclass
 class Crumb:
     url: str
@@ -89,6 +135,9 @@ class PageContext:
     hour: Optional[HourRef] = None
     prev_hour: Optional[HourRef] = None
     next_hour: Optional[HourRef] = None
+    period: Optional[str] = None
+    prev_period: Optional[PeriodRef] = None
+    next_period: Optional[PeriodRef] = None
     hour_meta: Dict[str, object] = field(default_factory=dict)
     empty_message: Optional[str] = None
 
@@ -156,6 +205,13 @@ class BrowseService:
             if level != LEVEL_CAMERAS
         )
 
+        prev_ref, next_ref = (None, None)
+        if camera is not None and level in _PERIOD_LEVELS:
+            prev_ref, next_ref = self._period_neighbours(
+                common, _PERIOD_LEVELS[level],
+                HourRef(camera=camera, year=year or 0, month=month or 0,
+                        day=day or 1, hour=0))
+
         context = PageContext(
             level=level,
             title=self._title(level, camera, year, month, day),
@@ -163,10 +219,24 @@ class BrowseService:
             subheading=self._subheading(level),
             breadcrumbs=self._breadcrumbs(common, camera, year, month, day),
             entries=entries,
+            period=_PERIOD_LEVELS.get(level),
+            prev_period=prev_ref,
+            next_period=next_ref,
         )
         if not entries:
             context.empty_message = "No recordings have been archived here yet."
         return context
+
+    def _period_neighbours(self, common: str, period: str,
+                           current: HourRef) -> Tuple[Optional[PeriodRef], Optional[PeriodRef]]:
+        """Previous/next period of the same level, skipping periods with no clips."""
+
+        list_children = self.store.list_child_directories
+        span = self.settings.max_year_span
+        prev_hour, next_hour = period_navigation(list_children, common, period, current,
+                                                 max_year_span=span)
+        to_ref = lambda ref: PeriodRef.from_hour(ref, period) if ref else None
+        return to_ref(prev_hour), to_ref(next_hour)
 
     def _directory_entry(self, common: str, level: str, camera: Optional[str],
                          year: Optional[int], month: Optional[int],

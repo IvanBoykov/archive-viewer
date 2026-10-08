@@ -415,3 +415,62 @@ def find_previous_hour(list_children: ListChildren, common_prefix: str, current:
         if hours:
             return HourRef(current.camera, year, month, day, hours[-1])
     return None
+
+
+#: Periods a listing page can offer previous/next links for. A year page has no
+#: entry: the camera page lists every year at once.
+PERIOD_MONTH = "month"
+PERIOD_DAY = "day"
+
+
+def _period_boundaries(period: str, current: HourRef) -> Tuple[HourRef, HourRef]:
+    """Anchor hours whose own period is excluded from the hour search.
+
+    A listing page has no hour, so the anchors sit at the extremes: the search
+    looks for hours strictly after the forward anchor and strictly before the
+    backward one, which makes both find nothing inside the current period and
+    move on to a neighbouring day or month. The forward month anchor is the
+    last day, because the day candidates it walks skip every day up to and
+    including the anchor's own day.
+    """
+
+    if period == PERIOD_MONTH:
+        last_day = calendar.monthrange(current.year, current.month)[1]
+        back = HourRef(current.camera, current.year, current.month, 1, 0)
+        forward = HourRef(current.camera, current.year, current.month, last_day, 23)
+    elif period == PERIOD_DAY:
+        back = HourRef(current.camera, current.year, current.month, current.day, 0)
+        forward = HourRef(current.camera, current.year, current.month, current.day, 23)
+    else:  # pragma: no cover - guarded by the callers
+        raise ValueError(f"unsupported period: {period!r}")
+    return back, forward
+
+
+def previous_period(list_children: ListChildren, common_prefix: str, period: str,
+                    current: HourRef, max_year_span: int = 5) -> Optional[HourRef]:
+    """Nearest earlier day or month holding clips, skipping empty ones."""
+
+    back, _ = _period_boundaries(period, current)
+    return find_previous_hour(list_children, common_prefix, back,
+                              max_year_span=max_year_span)
+
+
+def next_period(list_children: ListChildren, common_prefix: str, period: str,
+                current: HourRef, max_year_span: int = 5) -> Optional[HourRef]:
+    """Nearest later day or month holding clips, skipping empty ones."""
+
+    _, forward = _period_boundaries(period, current)
+    return find_next_hour(list_children, common_prefix, forward,
+                          max_year_span=max_year_span)
+
+
+def period_navigation(list_children: ListChildren, common_prefix: str, period: str,
+                      current: HourRef,
+                      max_year_span: int = 5) -> Tuple[Optional[HourRef], Optional[HourRef]]:
+    """ ``(previous, next)`` period refs for one listing page."""
+
+    back, forward = _period_boundaries(period, current)
+    return (
+        find_previous_hour(list_children, common_prefix, back, max_year_span=max_year_span),
+        find_next_hour(list_children, common_prefix, forward, max_year_span=max_year_span),
+    )
