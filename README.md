@@ -27,7 +27,7 @@ object cannot break a page or hide real data.
 ```bash
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env      # then edit it
+cp env.example .env       # then edit it
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
@@ -58,7 +58,7 @@ you are on.
 ## Configuration
 
 All settings come from the environment, loaded from `.env` when present. See
-`.env.example` for the full list. The important one is `ARCHIVE_HOST_MAP`:
+`env.example` for the full list. The important one is `ARCHIVE_HOST_MAP`:
 
 | Incoming `Host` | Behavior |
 | --- | --- |
@@ -70,7 +70,35 @@ the full object when `If-Range` is stale, answers `416` for unsatisfiable
 ranges, ignores malformed `Range` headers per RFC 9110, and refuses any key
 that is not an `.mp4` under the configured common prefix.
 
+Presigning signs locally and performs no network request, so a mapped endpoint
+only has to be reachable from the browser, never from the application server.
+The server needs to reach `ARCHIVE_S3_ENDPOINT_URL` alone, because listing and
+proxying go through it. Mapped endpoints are expected to be client-side
+addresses, such as an internal LAN host that the server itself cannot route to.
+The static credentials in `ARCHIVE_S3_ACCESS_KEY_ID` and
+`ARCHIVE_S3_SECRET_ACCESS_KEY` produce those signatures, so they must be
+valid for the mapped endpoint from the client's location, and the endpoint's
+hostname must resolve for the client.
+
 Garage needs `signature_version=s3v4` for presigning, so that is always used.
+
+## Container
+
+`Dockerfile` builds a multi-stage image that runs as a non-root user on port
+8000, and `compose.yaml` runs it with `env_file: .env`, which is required.
+
+```bash
+docker build -t archive-viewer .
+docker compose up --build
+```
+
+The compose file publishes port 8000 on every host interface and the
+application has no authentication of its own, so bind it to loopback and put an
+authenticating reverse proxy in front when the host is reachable from outside.
+
+`.github/workflows/docker-publish.yml` builds the image for `linux/amd64`,
+`linux/arm64` and `linux/arm/v7` on push to the default branch or a `v*` tag,
+and pushes it to GHCR as `ghcr.io/<owner>/<repo>`.
 
 ## Tests
 
