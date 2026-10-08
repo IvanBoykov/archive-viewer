@@ -13,7 +13,13 @@
   <ul class="tree__list">
     {% for entry in context.entries %}
     <li class="tree__item tree__item--{{ entry.kind }}">
+      {% if entry.url %}
       <a class="tree__link" href="{{ entry.url }}">{{ entry.label }}</a>
+      {% else %}
+      {# Folder outside the archive layout: shown so data is not hidden, but not
+         linked because opening it has no defined meaning. #}
+      <span class="tree__plain">{{ entry.label }}</span>
+      {% endif %}
     </li>
     {% endfor %}
   </ul>

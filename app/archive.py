@@ -58,22 +58,22 @@ class HourRef:
     def prefix(self, common_prefix: str) -> str:
         """S3 prefix for this hour, with a trailing slash."""
 
-        return (
-            f"{common_prefix}/{self.camera}/{self.year:04d}/"
-            f"{self.month:02d}/{self.day:02d}/{self.hour:02d}/"
-        )
+        return join_prefix(common_prefix, self.camera, f"{self.year:04d}",
+                           f"{self.month:02d}", f"{self.day:02d}", f"{self.hour:02d}")
 
     def day_prefix(self, common_prefix: str) -> str:
-        return f"{common_prefix}/{self.camera}/{self.year:04d}/{self.month:02d}/{self.day:02d}/"
+        return join_prefix(common_prefix, self.camera, f"{self.year:04d}",
+                           f"{self.month:02d}", f"{self.day:02d}")
 
     def month_prefix(self, common_prefix: str) -> str:
-        return f"{common_prefix}/{self.camera}/{self.year:04d}/{self.month:02d}/"
+        return join_prefix(common_prefix, self.camera, f"{self.year:04d}",
+                           f"{self.month:02d}")
 
     def year_prefix(self, common_prefix: str) -> str:
-        return f"{common_prefix}/{self.camera}/{self.year:04d}/"
+        return join_prefix(common_prefix, self.camera, f"{self.year:04d}")
 
     def camera_prefix(self, common_prefix: str) -> str:
-        return f"{common_prefix}/{self.camera}/"
+        return join_prefix(common_prefix, self.camera)
 
     def sort_key(self) -> Tuple[int, int, int, int]:
         return (self.year, self.month, self.day, self.hour)
@@ -167,9 +167,28 @@ def weekday_name(hour_ref: HourRef) -> str:
 
 
 def normalize_common_prefix(common_prefix: str) -> str:
-    """Strip stray slashes so prefixes are always ``name/`` when joined."""
+    """Strip stray slashes; an empty result means "cameras live at the bucket root"."""
 
     return common_prefix.strip("/")
+
+
+def join_prefix(*parts: Optional[str]) -> str:
+    """Join non-empty key parts with ``/`` and a trailing slash.
+
+    Used for S3 prefixes, which must never start with a slash: a leading slash
+    is a real key character and would match no object. An empty common prefix
+    therefore yields ``camera/2026/`` rather than ``/camera/2026/``.
+    """
+
+    pieces = [part for part in parts if part]
+    return "/".join(pieces) + "/" if pieces else ""
+
+
+def url_path(*parts: Optional[str]) -> str:
+    """Join non-empty parts into an absolute, trailing-slash URL path."""
+
+    pieces = [part for part in parts if part]
+    return "/" + "/".join(pieces) + "/" if pieces else "/"
 
 
 def parse_path(common_prefix: str, path: str) -> Tuple[str, Optional[HourRef]]:
@@ -187,15 +206,17 @@ def parse_path(common_prefix: str, path: str) -> Tuple[str, Optional[HourRef]]:
 
     if not segments:
         return LEVEL_CAMERAS, None
-    if segments[0] != common:
-        raise InvalidPath(f"path must start with the archive prefix {common!r}")
-    segments = segments[1:]
+    if common:
+        if segments[0] != common:
+            raise InvalidPath(f"path must start with the archive prefix {common!r}")
+        segments = segments[1:]
 
     depth = len(segments)
     if depth == 0:
         return LEVEL_CAMERAS, None
     if depth == 1:
         return LEVEL_YEARS, None
+    # Index 0 is the camera at every depth, with or without a common prefix.
     if depth == 2:
         if not YEAR_RE.match(segments[1]):
             raise InvalidPath("year segment must be 4 digits")
@@ -249,25 +270,21 @@ def build_path(common_prefix: str, hour_ref: Optional[HourRef] = None,
     """Build a canonical, trailing-slash URL path for any browse level."""
 
     common = normalize_common_prefix(common_prefix)
-    parts = [common]
     if hour_ref is not None:
-        parts += [
-            hour_ref.camera,
-            f"{hour_ref.year:04d}",
-            f"{hour_ref.month:02d}",
-            f"{hour_ref.day:02d}",
-            f"{hour_ref.hour:02d}",
-        ]
-        return "/" + "/".join(parts) + "/"
+        return url_path(common, hour_ref.camera, f"{hour_ref.year:04d}",
+                        f"{hour_ref.month:02d}", f"{hour_ref.day:02d}",
+                        f"{hour_ref.hour:02d}")
 
     if camera is None:
+        # The camera list is always served at the site root, whatever the
+        # common prefix is.
         return "/"
-    parts.append(camera)
+    parts = [camera]
     for value, width in ((year, 4), (month, 2), (day, 2), (hour, 2)):
         if value is None:
             break
         parts.append(f"{value:0{width}d}")
-    return "/" + "/".join(parts) + "/"
+    return url_path(common, *parts)
 
 
 def _numeric_children(names: Iterable[str], pattern: re.Pattern) -> List[int]:

@@ -18,6 +18,10 @@ from typing import Dict, Optional
 PATH_STYLE = "path"
 VIRTUAL_HOSTED_STYLE = "virtual"
 
+#: Default top-level folder holding the cameras. Set ARCHIVE_COMMON_PREFIX to an
+#: empty value when the cameras are stored directly at the bucket root.
+DEFAULT_COMMON_PREFIX = "archive"
+
 #: Presigned URLs are short lived: one hour, as required by the specification.
 DEFAULT_PRESIGN_EXPIRY = 3600
 
@@ -134,9 +138,13 @@ class Settings:
                 return default
             return value.strip()
 
-        common_prefix = (get("ARCHIVE_COMMON_PREFIX", "archive") or "archive").strip("/")
-        if not common_prefix:
-            raise ConfigError("ARCHIVE_COMMON_PREFIX must not be empty")
+        # An explicitly empty value is valid and means "cameras live at the
+        # bucket root"; only an entirely unset variable falls back to the
+        # default prefix.
+        if "ARCHIVE_COMMON_PREFIX" in env:
+            common_prefix = (env["ARCHIVE_COMMON_PREFIX"] or "").strip().strip("/")
+        else:
+            common_prefix = DEFAULT_COMMON_PREFIX
 
         settings = cls(
             bucket=get("ARCHIVE_S3_BUCKET", "video-archive"),

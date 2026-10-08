@@ -26,3 +26,24 @@ S3-compatible bucket, plus a Vanilla-JS accessible modal video player.
 - Navigation must never scan the whole bucket: one `ListObjectsV2`
   (Prefix + Delimiter='/') per calendar level.
 - Never add the `muted` attribute to the player; audio beats autoplay.
+
+## Empty common prefix (`ARCHIVE_COMMON_PREFIX=""`)
+- Supported: cameras sit at the bucket root, keys are `<camera>/<YYYY>/...` with
+  **no leading slash**. An S3 key starting with `/` addresses a different object.
+- `join_prefix()` is for directories only (it appends a trailing `/`); build clip
+  keys as `join_prefix(...) + filename`.
+- The camera list always lives at the site root `/`, so `build_path(common)` is
+  `/` in both modes; a camera page is `/cam/` when the prefix is empty.
+- With `Prefix=''`, `ListObjectsV2` also returns a `/` CommonPrefix when a
+  degenerate `/`-keyed object exists; it is filtered as out-of-layout.
+- `ARCHIVE_COMMON_PREFIX` unset means the default `archive`; explicitly empty
+  (or `/`) means root. `Settings.from_env` distinguishes them by key presence.
+
+## Out-of-layout folders never link
+Listing used to call `int(name)` directly, so a stray folder such as
+`<prefix>/<camera>/latest/` returned HTTP 500 (pre-existing bug, surfaced by running
+the empty-prefix config against real Garage). `browse._directory_entry` now
+validates each folder against the level regex, refuses ambiguous four-digit
+camera names, and catches `ValueError`; such entries get `url=None` and render
+as `.tree__plain` text. Traversal (`parse_path`, next/previous) was already
+strict and still 404s.

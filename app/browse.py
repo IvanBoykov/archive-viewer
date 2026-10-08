@@ -12,17 +12,22 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from .archive import (
+    DAY_RE,
+    HOUR_RE,
     LEVEL_CAMERAS,
     LEVEL_CLIPS,
     LEVEL_DAYS,
     LEVEL_HOURS,
     LEVEL_MONTHS,
     LEVEL_YEARS,
+    MONTH_RE,
+    YEAR_RE,
     Clip,
     HourRef,
     build_path,
     find_next_hour,
     find_previous_hour,
+    join_prefix,
     month_name,
     normalize_common_prefix,
     parse_hour_segments,
@@ -33,6 +38,15 @@ from .s3 import ArchiveStore
 
 logger = logging.getLogger(__name__)
 
+#: Directory names each level of the layout accepts, used to tell a real folder
+#: from one the archive layout does not describe.
+_LEVEL_NAME_RE = {
+    LEVEL_YEARS: YEAR_RE,
+    LEVEL_MONTHS: MONTH_RE,
+    LEVEL_DAYS: DAY_RE,
+    LEVEL_HOURS: HOUR_RE,
+}
+
 
 class LevelNotFound(Exception):
     """The requested path does not exist in the archive."""
@@ -40,9 +54,13 @@ class LevelNotFound(Exception):
 
 @dataclass
 class Entry:
-    """One row of a directory listing."""
+    """One row of a directory listing.
 
-    url: str
+    ``url`` is ``None`` for a folder that does not fit the archive layout, so it
+    is shown without pretending it can be opened.
+    """
+
+    url: Optional[str]
     label: str
     kind: str = "directory"
     key: Optional[str] = None
@@ -112,24 +130,24 @@ class BrowseService:
     # -- directory levels ------------------------------------------------
     def _directory_page(self, common: str, level: str, request_path: str) -> PageContext:
         segments = [s for s in request_path.strip("/").split("/") if s]
-        camera = segments[1] if len(segments) >= 2 else None
-        year = int(segments[2]) if len(segments) >= 3 else None
-        month = int(segments[3]) if len(segments) >= 4 else None
-        day = int(segments[4]) if len(segments) >= 5 else None
+        if common and segments and segments[0] == common:
+            segments = segments[1:]
+        camera = segments[0] if len(segments) >= 1 else None
+        year = int(segments[1]) if len(segments) >= 2 else None
+        month = int(segments[2]) if len(segments) >= 3 else None
+        day = int(segments[3]) if len(segments) >= 4 else None
 
         prefix = self._prefix_for(common, camera, year, month, day)
-        # The root level lists the folder that holds all cameras.
-        list_prefix = f"{common}/" if camera is None else prefix
+        # The root level lists the folder that holds all cameras, which is the
+        # bucket itself when the archive has no common prefix.
+        list_prefix = prefix
         directories, files = self.store.list_level(list_prefix)
 
         if not directories and not files and level != LEVEL_CAMERAS:
             raise LevelNotFound(request_path)
 
-        entries = [
-            Entry(url=self._child_url(common, level, camera, year, month, day, name),
-                  label=self._entry_label(level, name, camera, year, month, day))
-            for name in directories
-        ]
+        entries = [self._directory_entry(common, level, camera, year, month, day, name)
+                   for name in directories]
         # Clips only ever live inside an hour folder, but listing a stray object
         # beats silently hiding data from the browser.
         entries.extend(
@@ -150,16 +168,43 @@ class BrowseService:
             context.empty_message = "No recordings have been archived here yet."
         return context
 
+    def _directory_entry(self, common: str, level: str, camera: Optional[str],
+                         year: Optional[int], month: Optional[int],
+                         day: Optional[int], name: str) -> Entry:
+        """Build one listing row, flagging folders that do not fit the layout.
+
+        Buckets accumulate folders the layout never describes - a ``latest``
+        pointer, a 31st day in a 30-day month, a four-digit camera name that
+        would collide with a year. Linking those yields a server error and
+        hiding them loses data, so they render as plain text instead.
+        """
+
+        pattern = _LEVEL_NAME_RE.get(level)
+        if pattern is not None and not pattern.match(name):
+            logger.info("folder outside the archive layout at %s: %r", level, name)
+            return Entry(url=None, label=name, kind="unknown")
+        if level == LEVEL_CAMERAS and YEAR_RE.match(name):
+            logger.info("ambiguous four-digit camera name %r, not linking", name)
+            return Entry(url=None, label=name, kind="unknown")
+        try:
+            return Entry(
+                url=self._child_url(common, level, camera, year, month, day, name),
+                label=self._entry_label(level, name, camera, year, month, day),
+            )
+        except ValueError as exc:  # includes InvalidPath and impossible dates
+            logger.info("cannot link folder %r: %s", name, exc)
+            return Entry(url=None, label=name, kind="unknown")
+
     def _prefix_for(self, common: str, camera: Optional[str], year: Optional[int],
                     month: Optional[int], day: Optional[int]) -> str:
         if camera is None:
-            return ""
+            return join_prefix(common)
         parts = [common, camera]
         for value, width in ((year, 4), (month, 2), (day, 2)):
             if value is None:
                 break
             parts.append(f"{value:0{width}d}")
-        return "/".join(parts) + "/"
+        return join_prefix(*parts)
 
     def _child_url(self, common: str, level: str, camera: Optional[str], year: Optional[int],
                    month: Optional[int], day: Optional[int], name: str) -> str:

@@ -90,6 +90,7 @@ def proxy_key_is_allowed(key: str, settings: Settings) -> bool:
     common = settings.common_prefix.strip("/")
     if not normalized or ".." in normalized.split("/"):
         return False
-    if not normalized.startswith(f"{common}/"):
+    # An empty prefix means cameras sit at the bucket root, so any key qualifies.
+    if common and not normalized.startswith(f"{common}/"):
         return False
     return normalized.lower().endswith(".mp4")

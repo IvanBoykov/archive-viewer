@@ -15,6 +15,13 @@ Hours contain 0 to 60 clips and whole hours, days or months can be empty. Every
 level is listed with a single `ListObjectsV2` call using `Prefix` plus
 `Delimiter='/'`; the bucket is never scanned in full.
 
+Setting `ARCHIVE_COMMON_PREFIX` to an empty value drops the leading folder, so
+cameras are read directly from the bucket root and pages are served at
+`/<camera>/<YYYY>/...`. Folders that do not fit the layout at a given level - a
+`latest` pointer, a month named `13`, a four-digit camera name that would
+collide with a year - are listed as plain text rather than linked, so a stray
+object cannot break a page or hide real data.
+
 ## Run
 
 ```bash
