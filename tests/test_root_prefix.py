@@ -1,6 +1,6 @@
 """Tests for archives whose cameras sit directly at the bucket root.
 
-This is the ``ARCHIVE_COMMON_PREFIX=""`` configuration: keys look like
+This is the ``S3_PREFIX=""`` configuration: keys look like
 ``front/2026/10/04/19/14-14.mp4`` with no leading folder. An S3 key that starts
 with a slash addresses a different object, so an empty prefix must produce
 ``front/2026/...`` and never ``/front/2026/...``.
@@ -65,14 +65,7 @@ def root_store():
 
 @pytest.fixture()
 def root_settings(root_store) -> Settings:
-    return Settings(
-        bucket=BUCKET,
-        common_prefix=ROOT,
-        endpoint_url=ENDPOINT,
-        region="us-east-1",
-        access_key_id="test",
-        secret_access_key="test",
-    )
+    return Settings(bucket=BUCKET, region="us-east-1", common_prefix=ROOT)
 
 
 @pytest.fixture()
@@ -220,19 +213,14 @@ def test_proxy_allowlist_with_empty_prefix(root_settings):
 
 
 def test_proxy_allowlist_still_scopes_a_configured_prefix(root_store):
-    scoped = Settings(bucket=BUCKET, common_prefix="home", endpoint_url=ENDPOINT,
-                      region="us-east-1", access_key_id="test", secret_access_key="test")
+    scoped = Settings(bucket=BUCKET, region="us-east-1", common_prefix="home")
     assert proxy_key_is_allowed("home/front/2026/10/04/19/14-14.mp4", scoped)
     assert not proxy_key_is_allowed("other/front/2026/10/04/19/14-14.mp4", scoped)
 
 
 # -- configuration ------------------------------------------------------------
 
-BASE_ENV = {
-    "ARCHIVE_S3_BUCKET": "b",
-    "ARCHIVE_S3_ACCESS_KEY_ID": "a",
-    "ARCHIVE_S3_SECRET_ACCESS_KEY": "s",
-}
+BASE_ENV = {"S3_BUCKET": "b", "AWS_REGION": "us-east-1"}
 
 
 @pytest.mark.parametrize(
@@ -240,9 +228,9 @@ BASE_ENV = {
     [("", ""), ("   ", ""), ("/", ""), ("/home/", "home"), ("home", "home")],
 )
 def test_empty_prefix_is_accepted_from_env(value, expected):
-    env = dict(BASE_ENV, ARCHIVE_COMMON_PREFIX=value)
+    env = dict(BASE_ENV, S3_PREFIX=value)
     assert Settings.from_env(env).common_prefix == expected
 
 
-def test_unset_prefix_falls_back_to_the_default():
-    assert Settings.from_env(dict(BASE_ENV)).common_prefix == "archive"
+def test_unset_prefix_means_the_bucket_root():
+    assert Settings.from_env(dict(BASE_ENV)).common_prefix == ""

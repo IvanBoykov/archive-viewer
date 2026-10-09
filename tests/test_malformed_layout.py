@@ -42,9 +42,7 @@ def malformed_client():
         for key in STRAY_KEYS:
             client.put_object(Bucket=BUCKET, Key=key, Body=b"x" * 32,
                               ContentType="video/mp4")
-        settings = Settings(bucket=BUCKET, common_prefix=COMMON, endpoint_url=ENDPOINT,
-                            region="us-east-1", access_key_id="test",
-                            secret_access_key="test")
+        settings = Settings(bucket=BUCKET, region="us-east-1", common_prefix=COMMON)
         yield TestClient(create_app(settings), raise_server_exceptions=False)
 
 

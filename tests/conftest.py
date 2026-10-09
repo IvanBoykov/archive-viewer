@@ -72,14 +72,10 @@ def s3_resource():
 
 @pytest.fixture()
 def settings(s3_resource) -> Settings:
-    return Settings(
-        bucket=BUCKET,
-        common_prefix=COMMON_PREFIX,
-        endpoint_url=ENDPOINT,
-        region="us-east-1",
-        access_key_id="test",
-        secret_access_key="test",
-    )
+    # Credentials and the endpoint come from the environment (moto injects the
+    # former, the chain would read the latter), so a Settings instance only
+    # carries the bucket, the region and the prefix.
+    return Settings(bucket=BUCKET, region="us-east-1", common_prefix=COMMON_PREFIX)
 
 
 @pytest.fixture()

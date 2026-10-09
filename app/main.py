@@ -15,6 +15,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from botocore.exceptions import NoCredentialsError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .archive import InvalidPath, normalize_common_prefix
@@ -208,6 +209,13 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         except LevelNotFound:
             return _error(request, 404, "Nothing archived here",
                           f"No recordings exist at {path}.")
+        except NoCredentialsError:
+            # Credentials come from the botocore chain, so their absence can
+            # only surface on the first real request rather than at start-up.
+            logger.error("No S3 credentials found in the default chain")
+            return _error(request, 503, "Storage not accessible",
+                          "The viewer could not find S3 credentials. Check "
+                          "AWS_ACCESS_KEY_ID, AWS_PROFILE or the instance role.")
         if context.level == "clips":
             return render_hour(request, context)
         return render(request, "browse.html", {"context": context})
@@ -228,6 +236,14 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                            "context": error_context})
         response.status_code = status_code
         return response
+
+    @app.exception_handler(NoCredentialsError)
+    def missing_credentials_handler(request: Request, exc: NoCredentialsError):
+        # Reachable on the streaming path, where the chain is consulted per
+        # request and no page-level handler is in play.
+        logger.error("No S3 credentials found in the default chain")
+        return JSONResponse({"detail": "Storage credentials are not configured"},
+                            status_code=503)
 
     @app.exception_handler(StarletteHTTPException)
     def http_exception_handler(request: Request, exc: StarletteHTTPException):

@@ -5,6 +5,12 @@ different virtual hosts. The important piece is :data:`Settings.host_map`,
 which maps an incoming HTTP ``Host`` header onto a concrete S3 endpoint plus
 an addressing style. Hosts that are absent from the map fall back to the
 streaming proxy, which keeps S3 credentials server-side.
+
+Variable names follow the AWS SDK conventions so that one ``.env`` can serve
+this viewer and the archiver that writes the keys. Credentials, the S3 endpoint
+and every other credential source boto3 understands (``AWS_ACCESS_KEY_ID``,
+``AWS_PROFILE``, a shared config file, an instance role) are resolved by the
+default botocore chain and are deliberately not modelled here.
 """
 
 from __future__ import annotations
@@ -13,14 +19,16 @@ import json
 import os
 from dataclasses import dataclass, field
 from typing import Dict, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 #: Valid values for ``addressing_style``.
 PATH_STYLE = "path"
 VIRTUAL_HOSTED_STYLE = "virtual"
 
-#: Default top-level folder holding the cameras. Set ARCHIVE_COMMON_PREFIX to an
-#: empty value when the cameras are stored directly at the bucket root.
-DEFAULT_COMMON_PREFIX = "archive"
+#: Top-level folder holding the cameras. Empty by default: the archiver writes
+#: ``<S3_PREFIX><camera>/...`` with an empty prefix, so cameras sit at the
+#: bucket root unless ``S3_PREFIX`` says otherwise.
+DEFAULT_COMMON_PREFIX = ""
 
 #: Presigned URLs are short lived: one hour, as required by the specification.
 DEFAULT_PRESIGN_EXPIRY = 3600
@@ -67,6 +75,36 @@ class HostMapping:
             )
 
 
+def _resolve_region(env: Dict[str, str]) -> str:
+    """Pick the signing region, requiring an explicit one.
+
+    ``AWS_REGION`` is read first because the archiver's configuration uses that
+    name, while botocore's own chain only honours ``AWS_DEFAULT_REGION`` and a
+    shared config file. A presigned URL cannot be re-signed after a browser
+    received it, and an S3-compatible gateway rejects a region it does not
+    serve without revealing the right one, so guessing would fail late and
+    opaquely: an unset region is a configuration error instead.
+    """
+
+    for name in ("AWS_REGION", "AWS_DEFAULT_REGION"):
+        value = (env.get(name) or "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _validate_timezone(value: Optional[str]) -> Optional[str]:
+    """Check an IANA zone name, keeping it as the configured string."""
+
+    if value is None:
+        return None
+    try:
+        ZoneInfo(value)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ConfigError(f"S3_KEY_TIMEZONE is not a valid IANA timezone: {value!r}") from exc
+    return value
+
+
 def _parse_host_map(raw: str) -> Dict[str, HostMapping]:
     """Build the host map from a JSON document.
 
@@ -107,18 +145,20 @@ def _parse_host_map(raw: str) -> Dict[str, HostMapping]:
 
 @dataclass
 class Settings:
-    """Deployment settings, normally produced by :meth:`from_env`."""
+    """Deployment settings, normally produced by :meth:`from_env`.
+
+    Credentials are absent by design: every client is built by the default
+    botocore chain, so ``AWS_ACCESS_KEY_ID``, ``AWS_PROFILE``, a shared config
+    file or an instance role all work without a variable of our own. The S3
+    endpoint likewise comes from the chain (``AWS_ENDPOINT_URL_S3``), and the
+    addressing style is only configurable per mapped host.
+    """
 
     bucket: str
-    #: Top level folder inside the bucket, stored without slashes (``archive``).
-    common_prefix: str
-    endpoint_url: Optional[str] = None
-    region: str = "us-east-1"
-    access_key_id: Optional[str] = None
-    secret_access_key: Optional[str] = None
-    session_token: Optional[str] = None
-    #: Addressing style used by the server side proxy client.
-    addressing_style: str = PATH_STYLE
+    #: Region used to sign every request and presigned URL.
+    region: str
+    #: Top level folder inside the bucket, stored without slashes (empty = root).
+    common_prefix: str = DEFAULT_COMMON_PREFIX
     #: ``Host`` header -> direct access mapping.
     host_map: Dict[str, HostMapping] = field(default_factory=dict)
     presign_expiry: int = DEFAULT_PRESIGN_EXPIRY
@@ -127,6 +167,9 @@ class Settings:
     proxy_chunk_size: int = 256 * 1024
     #: Applied to ``Cache-Control`` of proxied media.
     proxy_cache_control: str = "private, max-age=300"
+    #: IANA zone the archiver used when it built key dates. Display only: the
+    #: viewer reads folder names as they are and converts nothing.
+    key_timezone: Optional[str] = None
 
     @classmethod
     def from_env(cls, environ: Optional[Dict[str, str]] = None) -> "Settings":
@@ -138,55 +181,50 @@ class Settings:
                 return default
             return value.strip()
 
-        # An explicitly empty value is valid and means "cameras live at the
-        # bucket root"; only an entirely unset variable falls back to the
-        # default prefix.
-        if "ARCHIVE_COMMON_PREFIX" in env:
-            common_prefix = (env["ARCHIVE_COMMON_PREFIX"] or "").strip().strip("/")
-        else:
-            common_prefix = DEFAULT_COMMON_PREFIX
+        # An empty S3_PREFIX is valid and means "cameras live at the bucket
+        # root", which is also what an unset variable means here.
+        common_prefix = (env.get("S3_PREFIX") or "").strip().strip("/")
 
         settings = cls(
-            bucket=get("ARCHIVE_S3_BUCKET", "video-archive"),
+            bucket=get("S3_BUCKET", "") or "",
+            region=_resolve_region(env),
             common_prefix=common_prefix,
-            endpoint_url=get("ARCHIVE_S3_ENDPOINT_URL"),
-            region=get("ARCHIVE_S3_REGION", "us-east-1"),
-            access_key_id=get("ARCHIVE_S3_ACCESS_KEY_ID") or get("AWS_ACCESS_KEY_ID"),
-            secret_access_key=get("ARCHIVE_S3_SECRET_ACCESS_KEY") or get("AWS_SECRET_ACCESS_KEY"),
-            session_token=get("ARCHIVE_S3_SESSION_TOKEN") or get("AWS_SESSION_TOKEN"),
-            addressing_style=get("ARCHIVE_S3_ADDRESSING_STYLE", PATH_STYLE),
             presign_expiry=int(get("ARCHIVE_PRESIGN_EXPIRY", str(DEFAULT_PRESIGN_EXPIRY))),
             max_year_span=int(get("ARCHIVE_MAX_YEAR_SPAN", str(DEFAULT_MAX_YEAR_SPAN))),
             proxy_chunk_size=int(get("ARCHIVE_PROXY_CHUNK_SIZE", str(256 * 1024))),
             proxy_cache_control=get("ARCHIVE_PROXY_CACHE_CONTROL", "private, max-age=300"),
+            key_timezone=_validate_timezone(get("S3_KEY_TIMEZONE")),
         )
+
+        if not settings.bucket:
+            raise ConfigError("S3_BUCKET is required")
+        if not settings.region:
+            raise ConfigError(
+                "A signing region is required: set AWS_REGION (or AWS_DEFAULT_REGION). "
+                "Presigned URLs cannot be re-signed after the browser receives them, "
+                "so the region cannot be guessed."
+            )
 
         raw_map = get("ARCHIVE_HOST_MAP")
         if raw_map:
             settings.host_map = _parse_host_map(raw_map)
-
-        if not settings.bucket:
-            raise ConfigError("ARCHIVE_S3_BUCKET is required")
-        # Normalise the default addressing style the same way Host mappings are.
-        style = HostMapping(endpoint_url=settings.endpoint_url or "http://localhost",
-                            addressing_style=settings.addressing_style).addressing_style
-        settings.addressing_style = style
         return settings
 
     def require_complete(self) -> None:
-        """Fail fast when mandatory credentials/bucket information is missing."""
+        """Fail fast when mandatory bucket/region information is missing.
 
-        missing = [
-            name
-            for name, value in (
-                ("ARCHIVE_S3_BUCKET", self.bucket),
-                ("ARCHIVE_S3_ACCESS_KEY_ID", self.access_key_id),
-                ("ARCHIVE_S3_SECRET_ACCESS_KEY", self.secret_access_key),
+        Credentials are not checked: they are resolved by the botocore chain,
+        which may use a profile or an instance role this module knows nothing
+        about.
+        """
+
+        if not self.bucket:
+            raise ConfigError("Missing required configuration: S3_BUCKET")
+        if not self.region:
+            raise ConfigError(
+                "Missing required configuration: a signing region "
+                "(AWS_REGION or AWS_DEFAULT_REGION)"
             )
-            if not value
-        ]
-        if missing:
-            raise ConfigError("Missing required configuration: " + ", ".join(missing))
 
     def resolve_host(self, host_header: Optional[str]) -> Optional[HostMapping]:
         """Return the direct-access mapping for a request ``Host`` header.

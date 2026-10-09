@@ -5,3 +5,6 @@ uvicorn[standard]
 boto3
 jinja2
 python-dotenv
+# S3_KEY_TIMEZONE is validated with zoneinfo, whose tzdata package the slim
+# Debian Python image does not ship; this wheel is its fallback.
+tzdata

@@ -30,6 +30,11 @@
 
     <footer class="site-footer">
       <p>{{ delivery_note }}</p>
+      {# Purely informational: the archiver names folders using this zone, so
+         the wall-clock labels on screen are relative to it. Hidden when unset. #}
+      {% if settings.key_timezone %}
+      <p class="site-footer__timezone">Clip times are in {{ settings.key_timezone }}.</p>
+      {% endif %}
     </footer>
 
     {# Screen-reader announcement region. Visually hidden, polite, atomic. #}

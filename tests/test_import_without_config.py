@@ -24,12 +24,9 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 APP_PACKAGE = PROJECT_ROOT / "app"
 
-# Stand-ins for the values a real deployment supplies.
-REQUIRED = {
-    "ARCHIVE_S3_BUCKET": "bucket",
-    "ARCHIVE_S3_ACCESS_KEY_ID": "id",
-    "ARCHIVE_S3_SECRET_ACCESS_KEY": "secret",
-}
+# Stand-ins for the values a real deployment supplies. Credentials are not
+# among them: the botocore chain resolves those independently of this module.
+REQUIRED = {"S3_BUCKET": "bucket", "AWS_REGION": "us-east-1"}
 
 
 @pytest.fixture

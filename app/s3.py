@@ -64,37 +64,45 @@ class ArchiveStore:
         self.settings = settings
         self._clients: Dict[Tuple[str, str, str], object] = {}
         self._lock = threading.Lock()
-        # Probe once so a misconfiguration fails at start-up rather than on the
-        # first page view.
-        self._client_for(None, settings.addressing_style, PRESIGN_SIGNATURE_VERSION)
+        # Build the server-side client once so an unusable endpoint or region
+        # fails at start-up rather than on the first page view. Credentials are
+        # not resolved here; boto3 does that lazily, per request.
+        self.client
 
     # -- client plumbing -------------------------------------------------
-    def _client_for(self, endpoint_url: Optional[str], addressing_style: str,
+    def _client_for(self, endpoint_url: Optional[str] = None,
+                    addressing_style: Optional[str] = None,
                     signature_version: Optional[str] = None):
-        cache_key = (endpoint_url or "", addressing_style, signature_version or "")
+        """Build a client, caching by the knobs that actually change behaviour.
+
+        No credentials or endpoint are passed for the server-side client: the
+        default chain resolves those from ``AWS_ACCESS_KEY_ID``/``AWS_PROFILE``/
+        an instance role and ``AWS_ENDPOINT_URL_S3``. Only the presigned-URL
+        clients override them, because their endpoint comes from the Host map
+        and must be baked into the signature the browser replays.
+        """
+
+        cache_key = (endpoint_url or "", addressing_style or "", signature_version or "")
         with self._lock:
             cached = self._clients.get(cache_key)
             if cached is not None:
                 return cached
 
-        cfg_kwargs = {
+        cfg_kwargs: Dict[str, object] = {
+            # Signed URLs cannot be re-signed once a browser holds them, so the
+            # region has to be the one the endpoint expects rather than a
+            # guessable default. It is therefore a required setting.
             "region_name": self.settings.region,
             "retries": {"max_attempts": 3, "mode": "standard"},
             "connect_timeout": 5,
             "read_timeout": 30,
-            "s3": {"addressing_style": addressing_style},
         }
+        if addressing_style:
+            cfg_kwargs["s3"] = {"addressing_style": addressing_style}
         if signature_version:
             cfg_kwargs["signature_version"] = signature_version
 
-        client = boto3.client(
-            "s3",
-            endpoint_url=endpoint_url,
-            aws_access_key_id=self.settings.access_key_id,
-            aws_secret_access_key=self.settings.secret_access_key,
-            aws_session_token=self.settings.session_token,
-            config=Config(**cfg_kwargs),
-        )
+        client = boto3.client("s3", endpoint_url=endpoint_url, config=Config(**cfg_kwargs))
         with self._lock:
             self._clients[cache_key] = client
         return client
@@ -103,7 +111,7 @@ class ArchiveStore:
     def client(self):
         """Client used for server-side listing and proxying."""
 
-        return self._client_for(self.settings.endpoint_url, self.settings.addressing_style)
+        return self._client_for()
 
     # -- listing ---------------------------------------------------------
     def list_level(self, prefix: str) -> Tuple[List[str], List[Tuple[str, Optional[int]]]]:

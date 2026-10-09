@@ -15,7 +15,7 @@ Hours contain 0 to 60 clips and whole hours, days or months can be empty. Every
 level is listed with a single `ListObjectsV2` call using `Prefix` plus
 `Delimiter='/'`; the bucket is never scanned in full.
 
-Setting `ARCHIVE_COMMON_PREFIX` to an empty value drops the leading folder, so
+Leaving `S3_PREFIX` empty drops the leading folder, so
 cameras are read directly from the bucket root and pages are served at
 `/<camera>/<YYYY>/...`. Folders that do not fit the layout at a given level - a
 `latest` pointer, a month named `13`, a four-digit camera name that would
@@ -72,13 +72,16 @@ that is not an `.mp4` under the configured common prefix.
 
 Presigning signs locally and performs no network request, so a mapped endpoint
 only has to be reachable from the browser, never from the application server.
-The server needs to reach `ARCHIVE_S3_ENDPOINT_URL` alone, because listing and
+The server needs to reach `AWS_ENDPOINT_URL_S3` alone, because listing and
 proxying go through it. Mapped endpoints are expected to be client-side
 addresses, such as an internal LAN host that the server itself cannot route to.
-The static credentials in `ARCHIVE_S3_ACCESS_KEY_ID` and
-`ARCHIVE_S3_SECRET_ACCESS_KEY` produce those signatures, so they must be
-valid for the mapped endpoint from the client's location, and the endpoint's
-hostname must resolve for the client.
+The credentials resolved by the default boto3 chain (`AWS_ACCESS_KEY_ID` with
+`AWS_SECRET_ACCESS_KEY`, a shared profile, or an instance role) produce those
+signatures, so they must be valid for the mapped endpoint from the client's
+location, and the endpoint's hostname must resolve for the client. The signing
+region comes from `AWS_REGION` and is required: a presigned URL cannot be
+re-signed once the browser holds it, and an S3-compatible gateway rejects a
+region it does not serve without naming the right one.
 
 Garage needs `signature_version=s3v4` for presigning, so that is always used.
 
