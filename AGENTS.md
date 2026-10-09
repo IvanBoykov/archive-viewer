@@ -26,6 +26,17 @@ S3-compatible bucket, plus a Vanilla-JS accessible modal video player.
 - Navigation must never scan the whole bucket: one `ListObjectsV2`
   (Prefix + Delimiter='/') per calendar level.
 - Never add the `muted` attribute to the player; audio beats autoplay.
+- `app.main` exposes `app` through a module-level `__getattr__` (PEP 562), not a
+  module-level `app = create_app()`. Importing the module must stay free of side
+  effects so `tests/conftest.py` can import it in a fresh clone with no `.env`;
+  `uvicorn app.main:app` still builds it and still exits on `ConfigError`, because
+  uvicorn resolves the attribute after the import.
+- `load_dotenv()` is called inside `create_app()` and searches upwards from
+  `app/main.py`, not from the working directory. A `.env` next to the checkout is
+  therefore used regardless of where uvicorn is started from, and a clone without
+  one fails fast. Keep any test that asserts "no configuration" away from the
+  checkout itself (see `tests/test_import_without_config.py`, which runs against a
+  copy of `app/` in `tmp_path`).
 
 ## Empty common prefix (`ARCHIVE_COMMON_PREFIX=""`)
 - Supported: cameras sit at the bucket root, keys are `<camera>/<YYYY>/...` with

@@ -314,7 +314,23 @@ def clips_as_dicts(clips) -> list:
     return [clip.as_dict() for clip in clips]
 
 
-# Module-level app for ASGI servers: ``uvicorn app.main:app``.
-app = create_app()
+def __getattr__(name: str) -> Any:
+    """Build the module-level ``app`` on first access (PEP 562).
 
-__all__ = ["app", "create_app", "MAX_PROXY_BYTES"]
+    ``uvicorn app.main:app`` resolves the attribute after importing the module,
+    so an ASGI server still builds the application and still aborts on invalid
+    configuration at startup. Importing this module no longer requires
+    deployment settings, which is what lets ``import app.main`` (and therefore
+    the test suite) succeed in a fresh clone with no ``.env`` present.
+    """
+
+    if name != "app":
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    application = create_app()
+    # Cache it as a real module attribute: repeated access skips this hook and
+    # every caller shares one instance.
+    globals()["app"] = application
+    return application
+
+
+__all__ = ["app", "create_app"]
