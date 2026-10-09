@@ -1,31 +1,36 @@
-FROM python:3.14-slim AS deps
+ARG BASE_IMAGE=python:3.14-slim
 
-WORKDIR /build
+FROM ${BASE_IMAGE} AS deps
 
-# Копируем только файл зависимостей для использования кэша Docker
+# Copy only the dependency file so the Docker layer cache is reusable.
 COPY requirements.txt .
+# Install dependencies into an isolated prefix.
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_NO_COMPILE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONHASHSEED=0 \
+    LC_ALL=C
 
-# Устанавливаем зависимости в изолированный префикс.
-# --no-cache-dir уменьшает размер слоя.
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir --require-hashes --no-compile --prefix=/install -r requirements.txt
 
-# Финальная стадия (Runtime)
-FROM python:3.14-slim
+# Final stage (runtime)
+FROM ${BASE_IMAGE}
 
 WORKDIR /code
 
-# Копируем установленные зависимости из стадии deps.
-# Префикс /install корректно ложится в /usr/local, 
-# который уже находится в PATH и PYTHONPATH базового образа.
+# Copy the installed dependencies from the deps stage.
+# The /install prefix lands cleanly in /usr/local,
+# which is already on PATH and PYTHONPATH in the base image.
 COPY --from=deps /install /usr/local
 ENV PYTHONUNBUFFERED=1
-# Создаем непривилегированного пользователя для безопасности
+# Run as an unprivileged user.
 RUN useradd -m -r appuser
-# Копируем исходный код проекта
+# Copy the application code
 COPY --chown=appuser:appuser ./app ./app
 
 USER appuser
 
-# Точка входа
-CMD ["uvicorn", "app.main:app", "--host", "::", "--port", "8000"]
+# Command
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 EXPOSE 8000
