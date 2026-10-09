@@ -22,6 +22,10 @@ cameras are read directly from the bucket root and pages are served at
 collide with a year - are listed as plain text rather than linked, so a stray
 object cannot break a page or hide real data.
 
+Folder names are read exactly as stored and never converted. `S3_KEY_TIMEZONE`
+is display only: when it is set to a valid IANA zone, the page footer says which
+zone the clip times are in. When it is unset the line is not rendered at all.
+
 ## Run
 
 ```bash
@@ -48,7 +52,8 @@ the hour page.
 
 The camera page lists every month of every year, so a heading per year keeps the
 months readable; the heading itself links to the year page, which remains a
-listing in its own right. Building it uses one extra list request per year, never a scan of the bucket.
+listing in its own right. Building it costs one extra list request per year,
+never a scan of the bucket.
 
 Month and day links jump to the nearest period that actually holds clips, so an
 empty period is never one click away. A month page links to a month page and a
@@ -67,8 +72,11 @@ All settings come from the environment, loaded from `.env` when present. See
 
 The proxy forwards `Range` requests, returns `206` with `Content-Range`, serves
 the full object when `If-Range` is stale, answers `416` for unsatisfiable
-ranges, ignores malformed `Range` headers per RFC 9110, and refuses any key
-that is not an `.mp4` under the configured common prefix.
+ranges, and ignores malformed `Range` headers per RFC 9110. It refuses - with
+`404`, so a probe cannot tell "not archived" from "not permitted" - any key that
+is not an `.mp4`, contains `..`, or (when `S3_PREFIX` is set) lies outside that
+prefix. With an empty `S3_PREFIX` any `.mp4` in the bucket is proxiable, so
+bucket policy still has to limit the read scope to the archive.
 
 Presigning signs locally and performs no network request, so a mapped endpoint
 only has to be reachable from the browser, never from the application server.
@@ -79,9 +87,11 @@ The credentials resolved by the default boto3 chain (`AWS_ACCESS_KEY_ID` with
 `AWS_SECRET_ACCESS_KEY`, a shared profile, or an instance role) produce those
 signatures, so they must be valid for the mapped endpoint from the client's
 location, and the endpoint's hostname must resolve for the client. The signing
-region comes from `AWS_REGION` and is required: a presigned URL cannot be
-re-signed once the browser holds it, and an S3-compatible gateway rejects a
-region it does not serve without naming the right one.
+region comes from `AWS_REGION` (or `AWS_DEFAULT_REGION`) and is required. The
+region is baked into a presigned URL, so a wrong one cannot be corrected after
+the browser has the link: the browser gets `400 AuthorizationHeaderMalformed`
+and the clip simply fails to play. Garage names the region it expected in that
+response body, which only helps a human fix the configuration.
 
 Garage needs `signature_version=s3v4` for presigning, so that is always used.
 
@@ -99,9 +109,9 @@ The compose file publishes port 8000 on every host interface and the
 application has no authentication of its own, so bind it to loopback and put an
 authenticating reverse proxy in front when the host is reachable from outside.
 
-`.github/workflows/docker-publish.yml` builds the image for `linux/amd64`,
-`linux/arm64` and `linux/arm/v7` on push to the default branch or a `v*` tag,
-and pushes it to GHCR as `ghcr.io/<owner>/<repo>`.
+`.github/workflows/docker-publish.yml` builds the image for `linux/amd64` and
+`linux/arm64` on push to `main`, `master` or a `v*` tag, and pushes it to GHCR as
+`ghcr.io/<owner>/<repo>`.
 
 ## Tests
 
@@ -114,8 +124,9 @@ The suite runs against `moto`'s fake S3 and covers the level parsing and label
 rules, cross-boundary previous/next hour search across empty hours, days,
 months and years, the month and day listings that link to the previous and next
 period of their own level, the camera page that groups months under year
-headings, the browse routes and their 404 handling, Range-proxy
-semantics, and host-driven proxy-versus-presign selection.
+headings, the browse routes and their 404 handling, Range-proxy semantics,
+host-driven proxy-versus-presign selection, and configuration parsing: required
+variables, the region requirement, the prefix spellings and the host map.
 
 ## Dependencies
 
@@ -123,9 +134,16 @@ semantics, and host-driven proxy-versus-presign selection.
 pinned `requirements.txt` and `requirements-dev.txt` are generated with:
 
 ```bash
-pip-compile requirements.in
-pip-compile requirements-dev.in
+pip-compile --generate-hashes
+pip-compile --allow-unsafe --generate-hashes requirements-dev.in
 ```
+
+`--generate-hashes` is what lets both `pip install --require-hashes` and the
+default hashed install work. `requirements-dev.in` needs `--allow-unsafe`
+because `moto` pulls `setuptools` into the tree, and pip-tools refuses to pin
+such a package without that flag. Both files must be compiled with the same
+Python version the image and CI use (3.14), which is what the header of each
+file records.
 
 ## License
 
