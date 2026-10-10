@@ -27,6 +27,12 @@ def read_nav(body):
 
 
 
+HOUR_NAV_BLOCK_RE = re.compile(
+    r'<nav class="hour-nav hour-nav--(top|bottom)"[^>]*aria-label="([^"]+)"'
+)
+HOUR_NAV_LINK_RE = re.compile(r'<a class="hour-nav__link" href="([^"]+)" rel="(prev|next)">')
+
+
 def text(response):
     return response.text
 
@@ -108,6 +114,34 @@ def test_hour_page_embeds_navigation_json(client):
     assert nav["next"] == "/home/front/2026/10/04/22/"
     assert nav["next_autofirst"] == "/home/front/2026/10/04/22/#auto-first"
     assert nav["previous"] is None
+
+
+def test_hour_page_has_navigation_at_top_and_bottom(client):
+    """Both listings bracket the clip list, as the month and day pages do."""
+
+    body = text(client.get(EXPECTED_CLIP_HOURS))
+    blocks = HOUR_NAV_BLOCK_RE.findall(body)
+    assert [pos for pos, _ in blocks] == ["top", "bottom"]
+    assert len({label for _, label in blocks}) == 2, "landmarks need distinct labels"
+
+    targets = [(m.group(2), m.group(1)) for m in HOUR_NAV_LINK_RE.finditer(body)]
+    assert targets == [("next", hour_path(day=4, hour=22))] * 2, targets
+
+
+def test_hour_page_navigation_brackets_the_clip_list(client):
+    body = text(client.get(EXPECTED_CLIP_HOURS))
+    top = body.index('class="hour-nav hour-nav--top"')
+    clips = body.index('class="clips"')
+    bottom = body.index('class="hour-nav hour-nav--bottom"')
+    assert top < clips < bottom
+
+
+def test_hour_page_repeats_the_edge_marker_top_and_bottom(client):
+    """The first hour has no predecessor, so both listings say so."""
+
+    body = text(client.get(EXPECTED_CLIP_HOURS))
+    assert body.count("Start of the archive") == 2
+    assert "aria-disabled" in body
 
 
 def test_cross_boundary_links_point_to_nearest_non_empty_hour(client):

@@ -1,0 +1,35 @@
+{# Previous/next hour links for the hourly clip listing.
+
+   Included twice per page; ``nav_position`` ("top"/"bottom") keeps the two
+   landmarks distinguishable for screen readers. Targets come from the backend
+   calendar search, so empty hours, days, months and years are crossed, and the
+   same two values feed the player through #hour-nav-data. #}
+{% set position = nav_position | default("top") %}
+{% set suffix = ", at the end of the listing" if position == "bottom" else "" %}
+<nav class="hour-nav hour-nav--{{ position }}"
+     aria-label="Previous and next hour{{ suffix }}">
+  <ul class="hour-nav__list">
+    <li class="hour-nav__item">
+      {% if navigation.previous %}
+      <a class="hour-nav__link" href="{{ navigation.previous }}" rel="prev">
+        &larr; Previous hour: {{ navigation.previous_label }}
+      </a>
+      {% else %}
+      <span class="hour-nav__link hour-nav__link--disabled" aria-disabled="true">
+        &larr; Start of the archive
+      </span>
+      {% endif %}
+    </li>
+    <li class="hour-nav__item">
+      {% if navigation.next %}
+      <a class="hour-nav__link" href="{{ navigation.next }}" rel="next">
+        Next hour: {{ navigation.next_label }} &rarr;
+      </a>
+      {% else %}
+      <span class="hour-nav__link hour-nav__link--disabled" aria-disabled="true">
+        End of the archive
+      </span>
+      {% endif %}
+    </li>
+  </ul>
+</nav>

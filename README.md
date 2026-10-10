@@ -48,7 +48,7 @@ the hour page.
 | Camera | Recorded months, grouped under a heading per year. |
 | Years | None: the listing already shows every entry. |
 | Months, days | Previous and next period, at the top and the bottom of the listing. |
-| Hours | Previous and next hour, consumed by both the page and the player. |
+| Hours | Previous and next hour, at the top and the bottom of the listing, consumed by both the page and the player. |
 
 The camera page lists every month of every year, so a heading per year keeps the
 months readable; the heading itself links to the year page, which remains a

@@ -6,26 +6,7 @@
 <h1>{{ context.heading }}</h1>
 <p class="lede">{{ context.subheading }} &mdash; {{ clips | length }} clip{{ '' if clips | length == 1 else 's' }}.</p>
 
-<p class="hour-nav" data-hour-nav>
-  {% if navigation.previous %}
-  <a class="hour-nav__link" href="{{ navigation.previous }}" rel="prev">
-    &larr; Previous hour: {{ navigation.previous_label }}
-  </a>
-  {% else %}
-  <span class="hour-nav__link hour-nav__link--disabled" aria-disabled="true">
-    &larr; Start of the archive
-  </span>
-  {% endif %}
-  {% if navigation.next %}
-  <a class="hour-nav__link" href="{{ navigation.next }}" rel="next">
-    Next hour: {{ navigation.next_label }} &rarr;
-  </a>
-  {% else %}
-  <span class="hour-nav__link hour-nav__link--disabled" aria-disabled="true">
-    End of the archive
-  </span>
-  {% endif %}
-</p>
+{% with nav_position = "top" %}{% include "partials/hour-nav.html" %}{% endwith %}
 
 <nav class="clips" aria-label="Clips recorded {{ hour_meta.hour_label }}">
   <ul class="clips__list">
@@ -50,6 +31,9 @@
     {% endfor %}
   </ul>
 </nav>
+
+{# The same navigation repeated at the end of a long listing. #}
+{% with nav_position = "bottom" %}{% include "partials/hour-nav.html" %}{% endwith %}
 
 {# Inline clip data for intra-hour navigation. Keep as a JSON array. #}
 <script type="application/json" id="hour-clips-data">{{ clips_json | safe }}</script>
