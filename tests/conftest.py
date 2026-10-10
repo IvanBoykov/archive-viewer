@@ -35,6 +35,37 @@ FIXTURE_HOURS = [
 SLASH = chr(47)
 
 
+#: Environment variables of the botocore credential/endpoint chain. A developer
+#: who exported a real deployment's values (``set -a; . ./.env``) would otherwise
+#: send the fixture's requests to that gateway instead of moto: ``mock_aws``
+#: intercepts AWS-style endpoints only, and the ``Settings`` these tests build
+#: carries no endpoint, so the exported one wins. The failure is not a connection
+#: error but the gateway's own ``AccessDenied``, which is easy to misread.
+AWS_CHAIN_VARS = (
+    "AWS_ENDPOINT_URL_S3",
+    "AWS_ENDPOINT_URL",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "AWS_PROFILE",
+    "AWS_SHARED_CREDENTIALS_FILE",
+    "AWS_CONFIG_FILE",
+)
+
+
+@pytest.fixture(autouse=True)
+def isolated_aws_chain(monkeypatch):
+    """Keep the ambient botocore chain out of every test.
+
+    No test reads the process environment for configuration - each builds an
+    explicit ``Settings`` - so dropping the chain cannot change an expectation,
+    and it guarantees no fixture's S3 traffic can reach a real endpoint.
+    """
+
+    for name in AWS_CHAIN_VARS:
+        monkeypatch.delenv(name, raising=False)
+
+
 def hour_prefix(camera: str, year: int, month: int, day: int, hour: int) -> str:
     """S3 prefix of one hour folder, assembled from numeric parts."""
 
