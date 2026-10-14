@@ -373,6 +373,19 @@ h1 {
   color: var(--accent-fg);
 }
 
+/* One filled button per page is the primary path; on an error page that is the
+   page the address most likely meant, with the camera list as the quiet
+   fallback beside it. */
+.btn--primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+
+.btn--primary:hover {
+  background: var(--bg);
+  color: var(--accent);
+}
+
 /* A disabled button must look disabled: without this the player's Prev/Next
    look exactly as clickable at the ends of an hour. Opacity alone would drop
    the text below AA, so color, border and cursor all change together, and the

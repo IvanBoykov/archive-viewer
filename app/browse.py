@@ -7,9 +7,11 @@ recursively.
 
 from __future__ import annotations
 
+import calendar
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from datetime import datetime
+from typing import Callable, Dict, List, Optional, Tuple
 
 from .archive import (
     DAY_RE,
@@ -62,6 +64,114 @@ _PERIOD_LEVELS = {
 
 class LevelNotFound(Exception):
     """The requested path does not exist in the archive."""
+
+
+@dataclass(frozen=True)
+class Suggestion:
+    """A page the error page can offer instead of only the camera list."""
+
+    url: str
+    label: str
+
+
+_EXPECTED_SEGMENTS = (("year", YEAR_RE), ("month", MONTH_RE),
+                      ("day", DAY_RE), ("hour", HOUR_RE))
+
+
+def _deepest_page(common: str, camera: Optional[str], year: Optional[int],
+                  month: Optional[int], day: Optional[int],
+                  hour: Optional[int]) -> Suggestion:
+    """The deepest page the given (possibly partial) address describes."""
+
+    if camera is None:
+        return Suggestion("/", "the camera list")
+    if year is None:
+        return Suggestion(build_path(common, camera=camera),
+                          f"the {pretty_name(camera)} page")
+    if month is None:
+        return Suggestion(build_path(common, camera=camera, year=year),
+                          f"{year} on {pretty_name(camera)}")
+    if day is None:
+        return Suggestion(build_path(common, camera=camera, year=year, month=month),
+                          f"{month_name(month)} {year} on {pretty_name(camera)}")
+    ref = HourRef(camera=camera, year=year, month=month, day=day, hour=hour or 0)
+    if hour is None:
+        return Suggestion(build_path(common, camera=camera, year=year, month=month,
+                                     day=day),
+                          f"{date_label(ref)} on {pretty_name(camera)}")
+    return Suggestion(build_path(common, hour_ref=ref),
+                      f"{hour:02d}:00 on {date_label(ref)} at {pretty_name(camera)}")
+
+
+def _bad_segment_reason(kind: str, segment: str) -> str:
+    if kind == "year":
+        return f"'{segment}' is not a year; year folders look like 2026."
+    if kind == "month":
+        return f"'{segment}' is not a month; month folders look like 01 to 12."
+    if kind == "day":
+        return (f"'{segment}' is not a day of the month; day folders look "
+                f"like 01 to 31.")
+    return f"'{segment}' is not an hour; hour folders look like 00 to 23."
+
+
+def explain_path(common_prefix: str,
+                 request_path: str) -> Tuple[Optional[str], Optional[Suggestion]]:
+    """Interpret a failing request path for the error page.
+
+    Returns ``(reason, suggestion)``. ``reason`` explains what the layout
+    rejected, or ``None`` when every segment is well-formed and the address is
+    simply empty of recordings. ``suggestion`` points at the deepest page the
+    valid prefix describes - the month page for a day like ``112``, the day
+    page for an hour like ``25`` - or, when the whole path is well-formed, at
+    its parent, so an empty hour links its day rather than the site root.
+    """
+
+    common = normalize_common_prefix(common_prefix)
+    segments = [s for s in request_path.strip("/").split("/") if s]
+    # The site root always renders the camera list, prefix or no prefix.
+    if not segments:
+        return None, None
+    if common:
+        if segments[0] != common:
+            return (f"The archive lives under /{common}/, so this address "
+                    f"cannot name a folder inside it.",
+                    Suggestion("/", "the camera list"))
+        segments = segments[1:]
+    if not segments:
+        return None, None
+
+    camera, *rest = segments
+    year = month = day = hour = None
+    for index, segment in enumerate(rest):
+        if index >= len(_EXPECTED_SEGMENTS):
+            target = _deepest_page(common, camera, year, month, day, hour)
+            return (f"Nothing in the archive lives below {target.label}.", target)
+        kind, pattern = _EXPECTED_SEGMENTS[index]
+        if not pattern.match(segment):
+            target = _deepest_page(common, camera, year, month, day, hour)
+            return _bad_segment_reason(kind, segment), target
+        value = int(segment)
+        if kind == "year":
+            year = value
+        elif kind == "month":
+            month = value
+        elif kind == "day":
+            day = value
+            try:
+                datetime(year, month, day)
+            except ValueError:
+                target = _deepest_page(common, camera, year, month, None, None)
+                return (f"There is no day {segment} in {month_name(month)} "
+                        f"{year}.", target)
+        else:
+            hour = value
+
+    # The whole path is well-formed and simply holds no recordings, so offer
+    # the level above it: an empty hour offers its day, an empty day its month.
+    parts: List[object] = [camera, year, month, day, hour]
+    depth = 1 + sum(1 for value in parts[1:] if value is not None)
+    parent = parts[: depth - 1] + [None] * (6 - depth)
+    return None, _deepest_page(common, *parent)  # type: ignore[arg-type]
 
 
 @dataclass
@@ -380,16 +490,11 @@ class BrowseService:
 
     def _title(self, level: str, camera: Optional[str], year: Optional[int],
                month: Optional[int], day: Optional[int]) -> str:
-        parts: List[str] = []
-        if camera:
-            parts.append(pretty_name(camera))
-        if year:
-            parts.append(str(year))
-        if month:
-            parts.append(month_name(month))
-        if day:
-            parts.append(str(day))
-        return " - ".join(parts) if parts else "Video archive"
+        # Same words as the heading, which already names the camera: the base
+        # template appends the site name, so the root reads "Cameras · Video
+        # archive" instead of "Video archive · Video archive", and a day page
+        # tab reads "Dacha - 13 October 2026" instead of a bare "13".
+        return self._heading(level, camera, year, month, day)
 
     def _heading(self, level: str, camera: Optional[str], year: Optional[int],
                  month: Optional[int], day: Optional[int]) -> str:

@@ -19,7 +19,16 @@ from botocore.exceptions import NoCredentialsError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .archive import InvalidPath, normalize_common_prefix
-from .browse import BrowseService, Crumb, LevelNotFound, PageContext, hour_navigation_urls, pretty_name
+from .browse import (
+    BrowseService,
+    Crumb,
+    LevelNotFound,
+    PageContext,
+    Suggestion,
+    explain_path,
+    hour_navigation_urls,
+    pretty_name,
+)
 from .config import Settings
 from .ranges import normalize_range_header, range_is_satisfiable
 from .s3 import ArchiveStore, ObjectNotFound, RangeNotSatisfiable
@@ -205,10 +214,14 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         try:
             context = browse.page_for_path(path)
         except InvalidPath as exc:
-            return _error(request, 404, "Unknown address", str(exc))
+            reason, suggestion = explain_path(settings.common_prefix, path)
+            return _error(request, 404, "Unknown address",
+                          reason or str(exc), suggestion=suggestion)
         except LevelNotFound:
+            reason, suggestion = explain_path(settings.common_prefix, path)
             return _error(request, 404, "Nothing archived here",
-                          f"No recordings exist at {path}.")
+                          reason or f"No recordings exist at {path}.",
+                          suggestion=suggestion)
         except NoCredentialsError:
             # Credentials come from the botocore chain, so their absence can
             # only surface on the first real request rather than at start-up.
@@ -220,9 +233,12 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             return render_hour(request, context)
         return render(request, "browse.html", {"context": context})
 
-    def _error(request: Request, status_code: int, heading: str, message: str) -> HTMLResponse:
+    def _error(request: Request, status_code: int, heading: str, message: str,
+               suggestion: Optional[Suggestion] = None) -> HTMLResponse:
         # The shared layout expects a page context, so give the error page one
-        # that points back at the archive root.
+        # that points back at the archive root. The suggestion is a button, not
+        # a crumb: aria-current="page" would claim the target is the current
+        # page, and it is the one the visitor was trying to reach.
         error_context = PageContext(
             level="error",
             title=heading,
@@ -233,7 +249,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         )
         response = render(request, "error.html",
                           {"status_code": status_code, "heading": heading, "message": message,
-                           "context": error_context})
+                           "suggestion": suggestion, "context": error_context})
         response.status_code = status_code
         return response
 
@@ -250,7 +266,9 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         if exc.status_code == 404 and not request.url.path.startswith(
             ("/static", PROXY_ROUTE_PREFIX)
         ):
-            return _error(request, 404, "Page not found", str(exc.detail))
+            _, suggestion = explain_path(settings.common_prefix, request.url.path)
+            return _error(request, 404, "Page not found", str(exc.detail),
+                          suggestion=suggestion)
         return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
 
     @app.exception_handler(Exception)

@@ -3,5 +3,14 @@
 {% block content %}
 <h1>{{ heading }}</h1>
 <p class="lede">{{ message }}</p>
+{% if suggestion %}
+<p>
+  <a class="btn btn--primary" href="{{ suggestion.url }}">Go to {{ suggestion.label }}</a>
+  {%- if suggestion.url != '/' %}
+  <a class="btn" href="/">Back to the camera list</a>
+  {%- endif %}
+</p>
+{% else %}
 <p><a class="btn" href="/">Back to the camera list</a></p>
+{% endif %}
 {% endblock %}

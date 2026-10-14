@@ -132,6 +132,36 @@ themes; anything new must use them rather than a literal color, or it will be
 unreadable in one of the two. Text values clear 4.5:1 and border values 3:1
 against both `--bg` and `--panel`.
 
+## Error pages say what broke and where to go instead
+`browse.explain_path(common_prefix, request_path)` reads the failing address
+segment by segment and returns `(reason, Suggestion)`. The reason names the
+first folder that cannot be right (`'112' is not a day of the month`), including
+calendar gaps (`no day 30 in February 2026`), and the suggestion is the deepest
+page the *valid* prefix describes: an impossible day offers its month, an
+impossible hour its day, an address below an hour offers that hour. When every
+segment is well-formed the address is simply empty, so the suggestion steps up
+one level - an empty hour offers its day, never the site root.
+
+Both `InvalidPath` and `LevelNotFound` consult it, because `parse_path` accepts
+any well-formed path and only the listing discovers that February 30 has no
+clips; the reason from `explain_path` is the more specific of the two messages.
+`None, None` means the address renders (a route or a generic 404 is the one
+showing it), which is why the root returns no reason even under a prefix.
+
+The suggestion is a `.btn--primary` link, *not* a crumb: breadcrumbs render
+their last entry with `aria-current="page"`, which would claim the target is the
+page you are on. It is the page you meant, so it is a button, and the camera
+list follows as the secondary button only when the target is deeper than the
+root. Tests in `tests/test_error_pages.py` build every address with `build_path`
+and `url_path`, following the no-date-literals convention the other test files
+already keep.
+
+## Page titles
+`BrowseService._title` delegates to `_heading`, so a tab reads
+`Dacha - October 2026 · Video archive` and the root reads `Cameras · Video
+archive` rather than repeating the site name. Do not reintroduce a title built
+from bare numbers: a tab reading `13` identifies nothing.
+
 ## The page behind the player must not scroll
 `player.js` adds `has-modal` to `<html>`; `styles.css` turns off overflow and
 pads by `--scrollbar-offset`, which `lockPageScroll()` measures *before* the
