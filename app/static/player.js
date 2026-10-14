@@ -36,7 +36,8 @@
   var prevButton = modal.querySelector("[data-prev]");
   var nextButton = modal.querySelector("[data-next]");
   var autoAdvance = modal.querySelector("[data-auto-advance]");
-  var nowPlaying = modal.querySelector("[data-now-playing]");
+  var clipTitle = modal.querySelector("[data-clip-title]");
+  var truncatedNotice = modal.querySelector("[data-truncated-notice]");
   var autoplayNotice = modal.querySelector("[data-autoplay-notice]");
 
   var FOCUSABLE =
@@ -71,6 +72,23 @@
     window.setTimeout(function () {
       live.textContent = message;
     }, 60);
+  }
+
+  /* The visible heading, spoken through aria-labelledby when the dialog opens.
+     "Now playing" would repeat what the dialog already announces, so the title
+     is just the address of the recording. */
+  function clipHeadline(clip) {
+    var parts = ["Clip"];
+    if (clip) {
+      parts.push(clip.absolute_time || clip.time);
+    }
+    if (nav.camera_label) {
+      parts.push(nav.camera_label);
+    }
+    if (nav.date_label) {
+      parts.push(nav.date_label);
+    }
+    return parts.join(" ");
   }
 
   function describeClip(clip) {
@@ -234,13 +252,16 @@
       return;
     }
     index = nextIndex;
-    if (nowPlaying) {
-      nowPlaying.textContent = describeClip(clip);
+    if (clipTitle) {
+      clipTitle.textContent = clipHeadline(clip);
     }
     if (clip.truncated) {
       video.setAttribute("data-truncated", "true");
     } else {
       video.removeAttribute("data-truncated");
+    }
+    if (truncatedNotice) {
+      truncatedNotice.hidden = !clip.truncated;
     }
     video.src = clip.video_url;
     video.load();

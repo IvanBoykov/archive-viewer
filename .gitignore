@@ -19,3 +19,6 @@ dist/
 
 # Local run logs
 *.log
+
+# Scratch dir for screenshots and browser recordings
+/.agent_tmp/

@@ -464,12 +464,21 @@ h1 {
 
 .modal__title {
   font-size: 1.125rem;
-  margin: 0 0 0.25rem;
+  margin: 0 0 0.75rem;
 }
 
-.modal__now {
+/* The list marks an unfinished recording with a badge; inside the player it is
+   a line of its own, because the dialog hides the list and the video alone does
+   not reveal that the file ends early. */
+.modal__truncated {
   margin: 0 0 0.75rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--danger);
+  border-left-width: 4px;
+  border-radius: 6px;
+  color: var(--danger);
+  font-size: 0.9375rem;
+  font-weight: 600;
 }
 
 .modal__video {

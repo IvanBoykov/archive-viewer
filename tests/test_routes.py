@@ -196,3 +196,31 @@ def test_hour_page_loads_the_player_script(client):
     assert 'aria-live="polite"' in body and "sr-only" in body
     # Autoplay must never be forced by muting the element.
     assert "muted" not in body
+
+
+def test_player_dialog_is_named_by_a_single_clip_heading(client):
+    body = text(client.get(EXPECTED_CLIP_HOURS))
+    assert 'aria-labelledby="player-title"' in body
+    assert 'id="player-title" class="modal__title" data-clip-title>Clip<' in body
+    # One heading only: no static "Clip player" label, no second line that
+    # repeats the clip the heading is about.
+    assert "Clip player" not in body
+    assert "now playing" not in body.lower()
+    assert body.count('class="modal__title"') == 1
+
+
+def test_truncated_notice_is_visible_markup_not_only_an_announcement(client):
+    body = text(client.get(EXPECTED_CLIP_HOURS))
+    assert 'aria-describedby="player-truncated"' in body
+    # A plain paragraph above the video, hidden by the attribute rather than by
+    # .sr-only, so sighted users get the same warning screen readers do.
+    assert 'class="modal__truncated"' in body
+    assert "This recording is incomplete." in body
+    panel = body.split('class="modal__panel"', 1)[1]
+    heading, notice, video = (
+        panel.index("player-title"),
+        panel.index("player-truncated"),
+        panel.index("data-player"),
+    )
+    assert heading < notice < video
+    assert 'class="sr-only" id="player-truncated"' not in body

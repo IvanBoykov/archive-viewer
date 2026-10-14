@@ -162,6 +162,19 @@ already keep.
 archive` rather than repeating the site name. Do not reintroduce a title built
 from bare numbers: a tab reading `13` identifies nothing.
 
+## The player dialog says which clip it shows
+`#player-title` is both the only heading in the dialog and its accessible name
+(`aria-labelledby`), so it must never hold a static label: `player.js` writes
+`Clip <time> <camera> <date>` into it (`clipHeadline`) for every selected clip,
+and the template ships the word `Clip` so a dialog opened before that write
+announces something true. The same clip is announced separately through
+`#live-region` (`describeClip`), which also carries the truncated warning; do not
+make the heading `aria-live`, or every next/previous re-speaks the dialog name.
+A truncated recording repeats that warning as a visible paragraph
+(`.modal__truncated`, `aria-describedby`) above the video: the clip list is
+behind the dialog and the file ending early is not visible in the player, so a
+screen-reader-only notice would leave sighted users uninformed.
+
 ## The page behind the player must not scroll
 `player.js` adds `has-modal` to `<html>`; `styles.css` turns off overflow and
 pads by `--scrollbar-offset`, which `lockPageScroll()` measures *before* the
