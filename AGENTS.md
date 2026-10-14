@@ -117,3 +117,25 @@ strict and still 404s.
 - `browse.html` renders `context.year_groups` first, then `context.entries`.
   The `<h2>` per year links to the year page, which still exists as its own
   listing and breadcrumb step.
+
+## Theming and the JavaScript-free catalog
+`tests/test_routes.py::test_page_needs_no_javascript_for_navigation` asserts
+`"<script" not in body` for a month page, so no catalog page may carry a script -
+not even a tiny inline one. The dark theme therefore lives entirely in
+`styles.css` behind `@media (prefers-color-scheme: dark)` and follows the
+operating system: a media query cannot flash the wrong palette the way a
+`localStorage` bootstrap script does, and it keeps that test honest. Adding a
+theme switch to the catalog means changing that test first, and it exists to
+protect "browsing works with JS disabled", so prefer keeping it.
+The palette is expressed only through the `:root` custom properties, in both
+themes; anything new must use them rather than a literal color, or it will be
+unreadable in one of the two. Text values clear 4.5:1 and border values 3:1
+against both `--bg` and `--panel`.
+
+## The page behind the player must not scroll
+`player.js` adds `has-modal` to `<html>`; `styles.css` turns off overflow and
+pads by `--scrollbar-offset`, which `lockPageScroll()` measures *before* the
+scrollbar disappears (hiding it is what changes `clientWidth`, so measuring
+afterwards yields 0 and the layout jumps). `.modal__panel` needs
+`overscroll-behavior: contain` so scrolling to the end of a tall panel does not
+hand the leftover scroll back to the page.

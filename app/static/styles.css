@@ -4,13 +4,42 @@
   --bg: #ffffff;
   --fg: #16181d;
   --muted: #5a6270;
-  --line: #d5d9e0;
+  --line: #868c98;
   --link: #0b4fbe;
   --link-visited: #5a2ea6;
   --accent: #0b4fbe;
+  --accent-fg: #ffffff;
   --panel: #f5f6f8;
   --danger: #8a1c1c;
   --focus: #b3261e;
+  --backdrop: rgba(10, 12, 16, 0.75);
+  --video-bg: #000000;
+  color-scheme: light;
+}
+
+/* Dark theme follows the operating system, like every other default here: the
+   catalog must stay JavaScript-free, and a media query cannot flash the wrong
+   palette the way a script can. Colors are chosen for light-on-dark rather
+   than inverted - the mid-grey that passes AA on white turns muddy on black,
+   and saturated blues vibrate. Every value below clears 4.5:1 for text and
+   3:1 for borders against both --bg and --panel. */
+@media (prefers-color-scheme: dark) {
+:root {
+  --bg: #14161a;
+  --fg: #e9ebef;
+  --muted: #a9b1c0;
+  --line: #666e7d;
+  --link: #7fb0ff;
+  --link-visited: #c9a6ff;
+  --accent: #7fb0ff;
+  --accent-fg: #14161a;
+  --panel: #1d2027;
+  --danger: #ff9a94;
+  --focus: #ff8f86;
+  --backdrop: rgba(0, 0, 0, 0.8);
+  --video-bg: #000000;
+  color-scheme: dark;
+}
 }
 
 *,
@@ -24,6 +53,28 @@ body {
   background: var(--bg);
   color: var(--fg);
   font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* The page behind an open dialog must not scroll: the panel scrolls itself, and
+   a page moving under a modal is disorienting and breaks the focus trap on
+   touch. The offset keeps the scrollbar width from shifting the layout. */
+html.has-modal {
+  overflow: hidden;
+  padding-right: var(--scrollbar-offset, 0px);
+}
+
+html.has-modal body {
+  overflow: hidden;
+}
+
+/* Respect the user's own choice: with a forced-colors/high-contrast mode the OS
+   palette wins, and our borders would otherwise override theirs. */
+@media (forced-colors: active) {
+  .tree__list,
+  .tree__item + .tree__item,
+  .btn {
+    border-color: CanvasText;
+  }
 }
 
 code {
@@ -55,7 +106,7 @@ video:focus-visible,
   left: -9999px;
   top: 0;
   background: var(--fg);
-  color: #fff;
+  color: var(--bg);
   padding: 0.5rem 0.75rem;
   z-index: 20;
 }
@@ -206,11 +257,14 @@ h1 {
   text-decoration: underline;
 }
 
-/* Folder that does not fit the archive layout: listed, but not navigable. */
+/* Folder that does not fit the archive layout: listed, but not navigable.
+   Marked as plain text rather than only greyed out, so the difference from a
+   link does not depend on color perception. */
 .tree__plain {
   display: block;
   padding: 0.6rem 0.75rem;
   color: var(--muted);
+  font-style: italic;
 }
 
 /* -- hour navigation --------------------------------------------------- */
@@ -234,6 +288,7 @@ h1 {
 
 .hour-nav__link--disabled {
   color: var(--muted);
+  cursor: not-allowed;
 }
 
 /* -- previous/next month and day navigation --------------------------- */
@@ -257,6 +312,7 @@ h1 {
 
 .period-nav__link--disabled {
   color: var(--muted);
+  cursor: not-allowed;
 }
 
 /* -- clip list --------------------------------------------------------- */
@@ -307,14 +363,39 @@ h1 {
   padding: 0.4rem 0.75rem;
   border: 1px solid var(--accent);
   border-radius: 6px;
-  background: #fff;
+  background: var(--bg);
   color: var(--accent);
   cursor: pointer;
 }
 
 .btn:hover {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
+}
+
+/* A disabled button must look disabled: without this the player's Prev/Next
+   look exactly as clickable at the ends of an hour. Opacity alone would drop
+   the text below AA, so color, border and cursor all change together, and the
+   "not-allowed" cursor carries the meaning without relying on color only. */
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  color: var(--muted);
+  border-color: var(--muted);
+  background: transparent;
+  cursor: not-allowed;
+}
+
+/* A hovered disabled button must not look clickable either, so this has to come
+   after .btn:hover and out-specify it. */
+.btn:disabled:hover,
+.btn[aria-disabled="true"]:hover {
+  background: transparent;
+  color: var(--muted);
+}
+
+.btn--small {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.875rem;
 }
 
 .btn--close {
@@ -343,7 +424,7 @@ h1 {
 .modal__backdrop {
   position: absolute;
   inset: 0;
-  background: rgba(10, 12, 16, 0.75);
+  background: var(--backdrop);
 }
 
 .modal__panel {
@@ -351,10 +432,21 @@ h1 {
   width: min(60rem, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
   overflow: auto;
+  /* Scrolling the panel must not hand the leftover scroll to the page. */
+  overscroll-behavior: contain;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 1rem;
+}
+
+/* On short or zoomed viewports the panel scrolls on its own. Without an
+   explicit focusable region, keyboard focus escapes to the page behind the
+   dialog the moment the user tabs past the last control, and a screen-reader
+   user cannot reach the clipped controls at all. */
+.modal__panel:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 .modal__title {
@@ -371,7 +463,7 @@ h1 {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: #000;
+  background: var(--video-bg);
   border-radius: 6px;
 }
 

@@ -15,9 +15,8 @@
         <a href="/">Video archive</a>
       </p>
       <p class="site-header__meta">
-        Storage: <code>{{ common_prefix }}</code> &middot;
         Delivery:
-        {%- if mode == 'presigned' %} direct links to S3 (valid {{ presign_expiry_minutes }} minutes)
+        {%- if mode == 'presigned' %} direct links to S3
         {%- else %} streamed by this server {%- endif %}
       </p>
     </header>
@@ -30,6 +29,19 @@
 
     <footer class="site-footer">
       <p>{{ delivery_note }}</p>
+      {# The link lifetime belongs here rather than in the header: it is the
+         answer for someone whose clip stopped opening an hour after the page
+         was loaded. #}
+      <p class="site-footer__delivery">
+        {%- if common_prefix %}Archive prefix <code>{{ common_prefix }}</code>
+        {%- else %}Archive at the bucket root{%- endif %}
+        {%- if mode == 'presigned' %}
+        &middot; video links are signed for {{ presign_expiry_minutes }} minutes and
+        stop working after that; reload the page for a fresh link
+        {%- else %}
+        &middot; video is streamed by this server, so links do not expire
+        {%- endif %}
+      </p>
       {# Purely informational: the archiver names folders using this zone, so
          the wall-clock labels on screen are relative to it. Hidden when unset. #}
       {% if settings.key_timezone %}

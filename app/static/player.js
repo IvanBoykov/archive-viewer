@@ -140,7 +140,7 @@
     returnFocusTo = document.activeElement;
     isOpen = true;
     modal.hidden = false;
-    document.documentElement.classList.add("has-modal");
+    lockPageScroll();
     selectClip(startIndex, false);
     document.addEventListener("keydown", onKeydown, true);
     video.focus();
@@ -157,7 +157,7 @@
     video.removeAttribute("src");
     video.load();
     modal.hidden = true;
-    document.documentElement.classList.remove("has-modal");
+    unlockPageScroll();
     document.removeEventListener("keydown", onKeydown, true);
     if (autoplayNotice) {
       autoplayNotice.hidden = true;
@@ -196,6 +196,22 @@
       event.preventDefault();
       first.focus();
     }
+  }
+
+  /* Freeze the page behind the dialog. The width has to be measured before
+     overflow is turned off, because hiding the scrollbar is exactly what
+     changes clientWidth; without the padding the whole layout would jump. */
+  function lockPageScroll() {
+    var root = document.documentElement;
+    var offset = window.innerWidth - root.clientWidth;
+    root.style.setProperty("--scrollbar-offset", (offset > 0 ? offset : 0) + "px");
+    root.classList.add("has-modal");
+  }
+
+  function unlockPageScroll() {
+    var root = document.documentElement;
+    root.classList.remove("has-modal");
+    root.style.removeProperty("--scrollbar-offset");
   }
 
   function onKeydown(event) {
