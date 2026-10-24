@@ -18,13 +18,13 @@ anyio==4.15.1 \
     # via
     #   starlette
     #   watchfiles
-boto3==1.43.110 \
-    --hash=sha256:0251b67d99cc0e7b958db48e7dd149094d453377fcd03299fde7329f975db2e6 \
-    --hash=sha256:74b811e6def4b30d685d4539a9ead3796f0e03a2112f00134e0f5e583ad8b098
+boto3==1.43.116 \
+    --hash=sha256:89fa15e7d1788fb17cbd694b034beba57f43f30f58f4506913a5b62220f8ba01 \
+    --hash=sha256:9dca4dbd464b189041b27b5a02280bd5e02c3051bebf6bd03cd0e47aaf558030
     # via -r requirements.in
-botocore==1.43.110 \
-    --hash=sha256:888cd54d59502e2195dac30805e5c08dd1be5416932a3793373e81b8f463e006 \
-    --hash=sha256:9f5ae5685b4d7129e32f6084ae8683d5857a1d60d77528b8da77bb53b9dff48f
+botocore==1.43.118 \
+    --hash=sha256:7f3f9d88cc9e847587690f82a42e3c3c292c3026c92c1e60d68a9310018e003f \
+    --hash=sha256:a45d7ae570674161e4a3542d8c68633bf7503f92d1de781ef7361b79488eda6f
     # via
     #   boto3
     #   s3transfer
